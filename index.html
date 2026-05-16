@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Viewpoint Resort — Purchase Request</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+:root {
+  --bg: #F5F3EE;
+  --surface: #FFFFFF;
+  --border: #E2DDD6;
+  --border-strong: #C8C2B8;
+  --text: #1A1916;
+  --text-2: #6B6760;
+  --text-3: #A8A49E;
+  --accent: #1A4A3A;
+  --accent-light: #E8F0EC;
+  --accent-mid: #2D7A5E;
+  --warn: #92400E;
+  --warn-bg: #FEF3C7;
+  --danger: #991B1B;
+  --danger-bg: #FEE2E2;
+  --success: #14532D;
+  --success-bg: #DCFCE7;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans Thai', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ─── Layout ─── */
+.shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}
+
+/* ─── Header ─── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0 18px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 28px;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.logo {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
+.brand-name { font-size: 15px; font-weight: 600; color: var(--text); }
+.brand-sub  { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+
+.tab-row {
+  display: flex;
+  gap: 2px;
+  background: var(--border);
+  border-radius: 8px;
+  padding: 3px;
+}
+.tab {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.tab.active {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* ─── View switch ─── */
+.view { display: none; }
+.view.active { display: block; }
+
+/* ─── Form Card ─── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.card-head {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.card-title { font-size: 16px; font-weight: 600; }
+.card-sub   { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+.card-body  { padding: 24px; }
+
+/* ─── Form grid ─── */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.span2 { grid-column: 1 / -1; }
+
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  letter-spacing: 0.3px;
+}
+.req { color: #DC2626; margin-left: 2px; }
+.field input,
+.field select,
+.field textarea {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--accent-mid);
+  box-shadow: 0 0 0 3px rgba(45,122,94,0.12);
+  background: #fff;
+}
+.field textarea { resize: vertical; min-height: 72px; }
+
+/* urgency chips */
+.urgency-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.urg-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text-2);
+  background: var(--bg);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.urg-chip input[type="radio"] { display: none; }
+.urg-chip:has(input:checked) { border-color: var(--accent); background: var(--accent-light); color: var(--accent); font-weight: 500; }
+.urg-chip.chip-warn:has(input:checked) { border-color: #D97706; background: var(--warn-bg); color: var(--warn); }
+.urg-chip.chip-danger:has(input:checked) { border-color: #DC2626; background: var(--danger-bg); color: var(--danger); }
+
+/* ─── Items table ─── */
+.items-wrap { margin-top: 4px; }
+.items-table { width: 100%; border-collapse: collapse; }
+.items-table th {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  text-align: left;
+  padding: 0 8px 8px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+.items-table td { padding: 5px 4px; vertical-align: middle; }
+.items-table input {
+  font-family: var(--sans);
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: var(--text);
+  outline: none;
+  width: 100%;
+  transition: border-color 0.12s;
+}
+.items-table input:focus { border-color: var(--accent-mid); background: #fff; }
+.del-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-3); font-size: 18px; line-height: 1;
+  padding: 4px 6px; border-radius: 5px; transition: all 0.12s;
+}
+.del-btn:hover { color: var(--danger); background: var(--danger-bg); }
+
+.add-row {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 10px;
+  font-size: 13px; color: var(--accent-mid);
+  background: none; border: none; cursor: pointer;
+  font-family: var(--sans); font-weight: 500;
+  padding: 4px 0;
+}
+.add-row:hover { color: var(--accent); }
+
+/* total badge */
+.total-bar {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 10px; margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  font-size: 13px; color: var(--text-2);
+}
+.total-amt {
+  font-family: var(--mono);
+  font-size: 16px; font-weight: 500; color: var(--text);
+}
+
+/* ─── Submit button ─── */
+.submit-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: background 0.15s, transform 0.1s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.submit-btn:hover { background: var(--accent-mid); }
+.submit-btn:active { transform: scale(0.99); }
+.submit-btn:disabled { background: var(--text-3); cursor: not-allowed; transform: none; }
+
+/* ─── Toast ─── */
+.toast {
+  display: none;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-top: 14px;
+}
+.toast.success { background: var(--success-bg); border: 1px solid #86EFAC; color: var(--success); }
+.toast.error   { background: var(--danger-bg);  border: 1px solid #FCA5A5; color: var(--danger); }
+.toast.show    { display: flex; }
+.toast-icon { font-size: 16px; line-height: 1.4; flex-shrink: 0; }
+.toast-pr  { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+
+/* ─── Admin ─── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.stat-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+.stat-num   { font-family: var(--mono); font-size: 24px; font-weight: 500; }
+.stat-num.s-pending  { color: #D97706; }
+.stat-num.s-approved { color: var(--success); }
+.stat-num.s-rejected { color: var(--danger); }
+
+.filter-bar {
+  display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.filter-bar select {
+  font-family: var(--sans); font-size: 13px;
+  padding: 7px 10px; border: 1px solid var(--border);
+  border-radius: 7px; background: var(--surface);
+  color: var(--text); outline: none; cursor: pointer;
+}
+.filter-bar select:focus { border-color: var(--accent-mid); }
+
+.refresh-btn {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 7px; font-family: var(--sans); font-size: 13px;
+  color: var(--text-2); cursor: pointer; transition: all 0.12s;
+}
+.refresh-btn:hover { border-color: var(--accent-mid); color: var(--accent); }
+
+/* PR cards */
+.pr-list { display: flex; flex-direction: column; gap: 8px; }
+
+.pr-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  transition: box-shadow 0.15s;
+}
+.pr-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.pr-card.urg-urgent  { border-left: 3px solid #D97706; }
+.pr-card.urg-critical { border-left: 3px solid #DC2626; }
+
+.pr-top {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 12px;
+  margin-bottom: 8px;
+}
+.pr-id-dept { display: flex; align-items: center; gap: 8px; }
+.pr-id { font-family: var(--mono); font-size: 12px; color: var(--text-3); }
+.pr-dept { font-size: 15px; font-weight: 600; }
+.pr-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+.badge {
+  font-size: 11px; font-weight: 500; padding: 3px 10px;
+  border-radius: 20px; white-space: nowrap;
+}
+.badge-pending  { background: var(--warn-bg);    color: var(--warn); }
+.badge-approved { background: var(--success-bg); color: var(--success); }
+.badge-rejected { background: var(--danger-bg);  color: var(--danger); }
+
+.pr-note { font-size: 12px; color: var(--text-2); font-style: italic; margin: 6px 0; }
+
+.pr-items-toggle {
+  font-size: 12px; color: var(--accent-mid); background: none; border: none;
+  cursor: pointer; font-family: var(--sans); padding: 0;
+  display: flex; align-items: center; gap: 4px;
+}
+.pr-items-body {
+  margin-top: 8px;
+  background: var(--bg);
+  border-radius: 7px;
+  padding: 10px 12px;
+  font-size: 12px; color: var(--text-2);
+}
+.pr-item-line {
+  display: flex; justify-content: space-between;
+  padding: 2px 0; border-bottom: 1px solid var(--border);
+}
+.pr-item-line:last-child { border: none; }
+.pr-total-line {
+  display: flex; justify-content: flex-end;
+  font-family: var(--mono); font-weight: 500;
+  font-size: 13px; color: var(--text);
+  padding-top: 6px; margin-top: 4px;
+  border-top: 1px solid var(--border-strong);
+}
+
+.pr-actions {
+  display: flex; gap: 8px; align-items: center; margin-top: 12px;
+  padding-top: 12px; border-top: 1px solid var(--border);
+}
+.pr-actions input {
+  flex: 1; font-family: var(--sans); font-size: 13px;
+  padding: 7px 10px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--bg); color: var(--text); outline: none;
+}
+.pr-actions input:focus { border-color: var(--accent-mid); background: #fff; }
+
+.btn-approve {
+  padding: 7px 14px; border-radius: 6px;
+  background: var(--success-bg); border: 1px solid #86EFAC;
+  color: var(--success); font-family: var(--sans); font-size: 13px;
+  font-weight: 500; cursor: pointer; white-space: nowrap;
+  transition: all 0.12s;
+}
+.btn-approve:hover { background: #BBF7D0; }
+.btn-reject {
+  padding: 7px 14px; border-radius: 6px;
+  background: var(--danger-bg); border: 1px solid #FCA5A5;
+  color: var(--danger); font-family: var(--sans); font-size: 13px;
+  font-weight: 500; cursor: pointer; white-space: nowrap;
+  transition: all 0.12s;
+}
+.btn-reject:hover { background: #FECACA; }
+
+.pr-comment {
+  font-size: 12px; color: var(--text-2); font-style: italic;
+  margin-top: 6px; display: flex; align-items: center; gap: 6px;
+}
+
+.empty {
+  text-align: center; padding: 48px 24px;
+  color: var(--text-3); font-size: 14px;
+}
+.empty-icon { font-size: 32px; display: block; margin-bottom: 10px; }
+
+.loading-bar {
+  display: none; text-align: center; padding: 32px;
+  color: var(--text-3); font-size: 13px;
+}
+.loading-bar.show { display: block; }
+
+/* ─── Admin password gate ─── */
+.pass-gate {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 360px;
+  margin: 0 auto;
+  text-align: center;
+}
+.pass-gate h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.pass-gate p  { font-size: 13px; color: var(--text-3); margin-bottom: 20px; }
+.pass-gate input {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: 7px; font-family: var(--mono); font-size: 14px;
+  background: var(--bg); outline: none; text-align: center; margin-bottom: 12px;
+  transition: border-color 0.12s;
+}
+.pass-gate input:focus { border-color: var(--accent-mid); background: #fff; }
+.pass-gate button {
+  width: 100%; padding: 10px; background: var(--accent);
+  color: #fff; border: none; border-radius: 7px;
+  font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer;
+}
+.pass-gate button:hover { background: var(--accent-mid); }
+.pass-err { color: var(--danger); font-size: 12px; margin-top: 8px; display: none; }
+/* ─── User pill (LIFF profile) ─── */
+.user-pill {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--accent-light); border: 1px solid var(--border);
+  border-radius: 40px; padding: 5px 14px 5px 5px;
+  margin-bottom: 4px;
+}
+.user-pill-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 600; flex-shrink: 0; overflow: hidden;
+}
+.user-pill-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.user-pill-name { font-size: 14px; font-weight: 500; color: var(--text); }
+.user-pill-sub  { font-size: 11px; color: var(--text-3); }
+.liff-loading {
+  font-size: 13px; color: var(--text-3); padding: 8px 0;
+  display: flex; align-items: center; gap: 8px;
+}
+
+
+/* ─── Item expand row ─── */
+.item-extra {
+  display: none;
+  background: var(--bg);
+  border-radius: 0 0 8px 8px;
+  padding: 10px 10px 12px;
+  border-top: 1px dashed var(--border);
+}
+.item-extra.open { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.item-extra-full { grid-column: 1/-1; }
+.extra-label { font-size: 11px; color: var(--text-3); font-weight: 500; letter-spacing: 0.3px; text-transform: uppercase; margin-bottom: 4px; }
+.item-extra input[type="text"],
+.item-extra textarea {
+  font-family: var(--sans); font-size: 13px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 7px 9px; color: var(--text); outline: none;
+  width: 100%; transition: border-color 0.12s;
+}
+.item-extra input:focus,
+.item-extra textarea:focus { border-color: var(--accent-mid); }
+.item-extra textarea { resize: vertical; min-height: 56px; }
+
+/* image upload */
+.img-upload-wrap { position: relative; }
+.img-upload-label {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border: 1px dashed var(--border);
+  border-radius: 6px; cursor: pointer; font-size: 12px;
+  color: var(--text-3); background: var(--surface);
+  transition: border-color 0.12s, color 0.12s;
+}
+.img-upload-label:hover { border-color: var(--accent-mid); color: var(--accent); }
+.img-upload-label input { display: none; }
+.img-preview {
+  width: 100%; max-height: 120px; object-fit: contain;
+  border-radius: 6px; margin-top: 6px; border: 1px solid var(--border);
+  display: none;
+}
+.img-preview.show { display: block; }
+.img-clear {
+  font-size: 11px; color: var(--danger); background: none; border: none;
+  cursor: pointer; margin-top: 4px; font-family: var(--sans); padding: 0; display: none;
+}
+.img-clear.show { display: inline-block; }
+
+/* toggle extra btn */
+.extra-toggle {
+  background: none; border: none; cursor: pointer;
+  font-size: 11px; color: var(--text-3); font-family: var(--sans);
+  padding: 0 2px; transition: color 0.12s; white-space: nowrap;
+}
+.extra-toggle:hover { color: var(--accent-mid); }
+.extra-toggle.open { color: var(--accent); }
+
+/* link chip in admin */
+.link-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  background: var(--accent-light); color: var(--accent);
+  text-decoration: none; font-weight: 500; margin-top: 2px;
+}
+.link-chip:hover { background: #d0e4da; }
+
+/* item image in admin */
+.admin-item-img {
+  width: 52px; height: 52px; object-fit: cover;
+  border-radius: 6px; border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .tab { font-size: 12px; padding: 5px 10px; }
+  .item-extra.open { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">VP</div>
+      <div>
+        <div class="brand-name">Viewpoint Resort</div>
+        <div class="brand-sub">ระบบจัดซื้อภายใน</div>
+      </div>
+    </div>
+    <div class="tab-row">
+      <button class="tab active" onclick="switchTab('staff', this)">ส่งคำขอ</button>
+      <button class="tab" onclick="switchTab('admin', this)">Admin</button>
+    </div>
+  </header>
+
+  <!-- ════ STAFF VIEW ════ -->
+  <div id="view-staff" class="view active">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">แบบฟอร์มขอจัดซื้อ</div>
+          <div class="card-sub">กรอกข้อมูลให้ครบถ้วน ระบบจะบันทึกลง Google Sheet อัตโนมัติ</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="form-grid">
+
+          <!-- แผนก -->
+          <div class="field">
+            <label>แผนก <span class="req">*</span></label>
+            <select id="f-dept">
+              <option value="">— เลือกแผนก —</option>
+              <option>F&amp;B / Kitchen</option>
+              <option>Housekeeping</option>
+              <option>Engineering / Maintenance</option>
+              <option>Front Office</option>
+              <option>Admin / HR</option>
+              <option>Management</option>
+              <option>ก่อสร้าง / Construction</option>
+            </select>
+          </div>
+
+          <!-- LIFF Profile — ดึงอัตโนมัติจาก LINE -->
+          <div class="field span2">
+            <label>ผู้ส่งคำขอ</label>
+            <!-- แสดงเมื่อ LIFF โหลดสำเร็จ -->
+            <div id="user-pill" class="user-pill" style="display:none">
+              <div class="user-pill-avatar" id="user-pill-avatar">?</div>
+              <div>
+                <div class="user-pill-name" id="user-pill-name">—</div>
+                <div class="user-pill-sub">ดึงจาก LINE Profile อัตโนมัติ ✓</div>
+              </div>
+            </div>
+            <!-- แสดงระหว่างโหลด -->
+            <div id="liff-loading" class="liff-loading">
+              <span>⏳</span><span>กำลังดึงข้อมูล LINE...</span>
+            </div>
+            <!-- fallback: ถ้าเปิดนอก LINE / dev mode -->
+            <div id="liff-fallback" style="display:none">
+              <input id="f-name" type="text" placeholder="ชื่อ-นามสกุล (กรณีเปิดนอก LINE)"
+                autocomplete="off" oninput="lineProfile.displayName=this.value.trim()">
+              <span style="font-size:11px;color:var(--text-3);margin-top:4px;display:block">
+                💡 กรุณาเปิดผ่าน LINE เพื่อดึงชื่ออัตโนมัติ
+              </span>
+            </div>
+          </div>
+
+          <!-- วันที่ต้องการ -->
+          <div class="field">
+            <label>วันที่ต้องการ <span class="req">*</span></label>
+            <input id="f-date" type="date">
+          </div>
+
+          <!-- ความเร่งด่วน -->
+          <div class="field">
+            <label>ความเร่งด่วน</label>
+            <div class="urgency-row">
+              <label class="urg-chip">
+                <input type="radio" name="urgency" value="normal" checked> ปกติ
+              </label>
+              <label class="urg-chip chip-warn">
+                <input type="radio" name="urgency" value="urgent"> ⚡ เร่งด่วน
+              </label>
+              <label class="urg-chip chip-danger">
+                <input type="radio" name="urgency" value="critical"> 🔴 วิกฤต
+              </label>
+            </div>
+          </div>
+
+          <!-- หมายเหตุ -->
+          <div class="field span2">
+            <label>หมายเหตุ / เหตุผลการขอจัดซื้อ</label>
+            <textarea id="f-note" placeholder="อธิบายบริบทหรือเหตุผลเพิ่มเติม..."></textarea>
+          </div>
+
+          <!-- รายการสินค้า -->
+          <div class="field span2">
+            <label>รายการสินค้า <span class="req">*</span></label>
+            <div class="items-wrap">
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th style="width:30%">ชื่อสินค้า</th>
+                    <th style="width:10%">จำนวน</th>
+                    <th style="width:13%">หน่วย</th>
+                    <th style="width:14%">ราคา/หน่วย (฿)</th>
+                    <th style="width:10%">รวม (฿)</th>
+                    <th style="width:16%">รายละเอียด</th>
+                    <th style="width:7%"></th>
+                  </tr>
+                </thead>
+                <tbody id="items-body"></tbody>
+              </table>
+              <button class="add-row" type="button" onclick="addRow()">+ เพิ่มรายการ</button>
+              <div class="total-bar">
+                <span>มูลค่ารวมทั้งหมด</span>
+                <span class="total-amt" id="grand-total">฿0</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <button class="submit-btn" id="submit-btn" onclick="submitPR()">
+          <span id="btn-text">ส่ง Purchase Request</span>
+        </button>
+
+        <div class="toast" id="toast-success">
+          <span class="toast-icon">✅</span>
+          <div>
+            <div>ส่งสำเร็จ! บันทึกลง Google Sheet แล้ว</div>
+            <div class="toast-pr" id="toast-prid"></div>
+          </div>
+        </div>
+        <div class="toast error" id="toast-error">
+          <span class="toast-icon">⚠️</span>
+          <div id="toast-errmsg"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ ADMIN VIEW ════ -->
+  <div id="view-admin" class="view">
+
+    <!-- Password gate -->
+    <div id="pass-gate" class="pass-gate">
+      <h2>🔒 Admin Login</h2>
+      <p>ใส่รหัสผ่านเพื่อเข้าดูรายการทั้งหมด</p>
+      <input type="password" id="pass-input" placeholder="รหัสผ่าน" onkeydown="if(event.key==='Enter')checkPass()">
+      <button onclick="checkPass()">เข้าสู่ระบบ</button>
+      <div class="pass-err" id="pass-err">รหัสผ่านไม่ถูกต้อง</div>
+    </div>
+
+    <!-- Admin dashboard (hidden until login) -->
+    <div id="admin-dash" style="display:none">
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">ทั้งหมด</div>
+          <div class="stat-num" id="s-all">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">รอดำเนินการ</div>
+          <div class="stat-num s-pending" id="s-pending">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">อนุมัติแล้ว</div>
+          <div class="stat-num s-approved" id="s-approved">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">ปฏิเสธ</div>
+          <div class="stat-num s-rejected" id="s-rejected">—</div>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <select id="f-fdept" onchange="applyFilter()">
+          <option value="">ทุกแผนก</option>
+          <option>F&amp;B / Kitchen</option>
+          <option>Housekeeping</option>
+          <option>Engineering / Maintenance</option>
+          <option>Front Office</option>
+          <option>Admin / HR</option>
+          <option>Management</option>
+          <option>ก่อสร้าง / Construction</option>
+        </select>
+        <select id="f-fstatus" onchange="applyFilter()">
+          <option value="">ทุกสถานะ</option>
+          <option value="รอดำเนินการ">รอดำเนินการ</option>
+          <option value="✅ อนุมัติแล้ว">อนุมัติแล้ว</option>
+          <option value="❌ ปฏิเสธ">ปฏิเสธ</option>
+        </select>
+        <select id="f-furg" onchange="applyFilter()">
+          <option value="">ทุกระดับ</option>
+          <option value="ปกติ">ปกติ</option>
+          <option value="⚡ เร่งด่วน">เร่งด่วน</option>
+          <option value="🔴 วิกฤต">วิกฤต</option>
+        </select>
+        <button class="refresh-btn" onclick="loadAdmin()">↻ รีเฟรช</button>
+      </div>
+
+      <div class="loading-bar" id="loading">กำลังโหลดข้อมูลจาก Google Sheet...</div>
+      <div class="pr-list" id="pr-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════
+const CONFIG = {
+  LIFF_ID:         "YOUR_LIFF_ID",   // ← ใส่ LIFF ID ที่สร้างจาก LINE Developers
+  WEBHOOK_URL:     "https://script.google.com/macros/s/AKfycbyHn2i50bAojiVhVCBs9eL17LJ0km-FB-8IuYZz7W1F_zFocWe210WCSSjvB1o3ygD8Sw/exec",
+  ADMIN_PASS:      "viewpoint2024",
+};
+
+// ── state ──────────────────────────────────────
+let rowCount   = 0;
+let allPRs     = [];
+let expanded   = {};
+let lineProfile = { userId: "", displayName: "", pictureUrl: "" };
+
+// ═══════════════════════════════════════════════
+//  LIFF INIT — เหมือน Maintenance Bot เป๊ะ
+// ═══════════════════════════════════════════════
+async function initLiff() {
+  try {
+    await liff.init({ liffId: CONFIG.LIFF_ID });
+
+    if (!liff.isLoggedIn()) {
+      liff.login({ redirectUri: location.href });
+      return;
+    }
+
+    const profile = await liff.getProfile();
+    lineProfile = {
+      userId:      profile.userId,
+      displayName: profile.displayName,
+      pictureUrl:  profile.pictureUrl || "",
+    };
+
+    // แสดง user pill
+    const pill    = document.getElementById("user-pill");
+    const pillAvt = document.getElementById("user-pill-avatar");
+    const pillNm  = document.getElementById("user-pill-name");
+
+    if (profile.pictureUrl) {
+      pillAvt.innerHTML = `<img src="${profile.pictureUrl}" alt="${profile.displayName}">`;
+    } else {
+      pillAvt.textContent = profile.displayName.charAt(0).toUpperCase();
+    }
+    pillNm.textContent = profile.displayName;
+
+    document.getElementById("liff-loading").style.display = "none";
+    document.getElementById("liff-fallback").style.display = "none";
+    pill.style.display = "flex";
+
+  } catch (e) {
+    // dev mode / เปิดนอก LINE
+    console.log("LIFF dev mode:", e.message);
+    document.getElementById("liff-loading").style.display = "none";
+    document.getElementById("liff-fallback").style.display = "block";
+    // ใช้ชื่อที่กรอกแทน
+    lineProfile = { userId: "dev", displayName: "", pictureUrl: "" };
+  }
+}
+initLiff();
+
+// ── tabs ─────────────────────────────────────────────────────
+function switchTab(tab, btn) {
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+  document.getElementById("view-" + tab).classList.add("active");
+  btn.classList.add("active");
+}
+
+// ── items table ──────────────────────────────────────────────
+function addRow() {
+  const id = ++rowCount;
+  const tbody = document.getElementById("items-body");
+
+  // main row
+  const tr = document.createElement("tr");
+  tr.id = "row-" + id;
+  tr.innerHTML = `
+    <td><input type="text" placeholder="ชื่อสินค้า" data-f="name" oninput="calcTotal()"></td>
+    <td><input type="number" placeholder="0" min="1" data-f="qty" style="width:64px" oninput="calcRowTotal(${id});calcTotal()"></td>
+    <td><input type="text" placeholder="ชิ้น/กล่อง" data-f="unit" oninput="calcTotal()"></td>
+    <td><input type="number" placeholder="0" min="0" data-f="price" style="width:84px" oninput="calcRowTotal(${id});calcTotal()"></td>
+    <td><span id="sub-${id}" style="font-family:var(--mono);font-size:12px;color:var(--text-3)">—</span></td>
+    <td style="text-align:center">
+      <button class="extra-toggle" id="etbtn-${id}" onclick="toggleExtra(${id})" type="button" title="เพิ่มรูป / คำอธิบาย / ลิงก์">+ ข้อมูล</button>
+    </td>
+    <td><button class="del-btn" onclick="delRow(${id})" type="button">×</button></td>
+  `;
+  tbody.appendChild(tr);
+
+  // expandable extra row
+  const xtr = document.createElement("tr");
+  xtr.id = "extra-row-" + id;
+  xtr.innerHTML = `
+    <td colspan="7" style="padding:0 4px 6px">
+      <div class="item-extra" id="extra-${id}">
+
+        <!-- รูปสินค้า -->
+        <div>
+          <div class="extra-label">รูปสินค้า (ตัวอย่าง)</div>
+          <div class="img-upload-wrap">
+            <label class="img-upload-label">
+              <span>📷 เลือกรูปภาพ</span>
+              <input type="file" accept="image/*" onchange="handleImg(${id}, this)">
+            </label>
+            <img class="img-preview" id="img-prev-${id}" alt="รูปสินค้า">
+            <button class="img-clear" id="img-clear-${id}" onclick="clearImg(${id})" type="button">✕ ลบรูป</button>
+          </div>
+        </div>
+
+        <!-- คำอธิบายสินค้า -->
+        <div>
+          <div class="extra-label">คำอธิบาย / สเปค</div>
+          <textarea placeholder="สี, ขนาด, สเปค หรือรายละเอียดเพิ่มเติม..." data-f="desc" rows="3" id="desc-${id}"></textarea>
+        </div>
+
+        <!-- ลิงก์สั่งซื้อ -->
+        <div class="item-extra-full">
+          <div class="extra-label">ลิงก์สั่งซื้อ / อ้างอิง</div>
+          <input type="text" placeholder="https://www.lazada.co.th/... หรือ URL อื่นๆ" data-f="link" id="link-${id}">
+        </div>
+
+      </div>
+    </td>
+  `;
+  tbody.appendChild(xtr);
+}
+
+function toggleExtra(id) {
+  const panel = document.getElementById("extra-" + id);
+  const btn   = document.getElementById("etbtn-" + id);
+  const open  = panel.classList.toggle("open");
+  btn.classList.toggle("open", open);
+  btn.textContent = open ? "▲ ปิด" : "+ ข้อมูล";
+}
+
+function handleImg(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  // resize to max 600px & compress before storing
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const MAX = 600;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else       { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      const b64 = canvas.toDataURL("image/jpeg", 0.7);
+      // store on row element
+      document.getElementById("row-" + id).dataset.img = b64;
+      const prev = document.getElementById("img-prev-" + id);
+      const clr  = document.getElementById("img-clear-" + id);
+      prev.src = b64;
+      prev.classList.add("show");
+      clr.classList.add("show");
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImg(id) {
+  document.getElementById("row-" + id).dataset.img = "";
+  const prev = document.getElementById("img-prev-" + id);
+  const clr  = document.getElementById("img-clear-" + id);
+  prev.src = ""; prev.classList.remove("show");
+  clr.classList.remove("show");
+  // reset file input
+  const wrap = document.getElementById("extra-" + id);
+  const inp  = wrap.querySelector("input[type='file']");
+  if (inp) inp.value = "";
+}
+
+function delRow(id) {
+  document.getElementById("row-" + id)?.remove();
+  document.getElementById("extra-row-" + id)?.remove();
+  calcTotal();
+}
+
+function calcRowTotal(id) {
+  const row = document.getElementById("row-" + id);
+  if (!row) return;
+  const qty = parseFloat(row.querySelector("[data-f='qty']").value) || 0;
+  const price = parseFloat(row.querySelector("[data-f='price']").value) || 0;
+  const sub = qty * price;
+  document.getElementById("sub-" + id).textContent = sub > 0
+    ? "฿" + sub.toLocaleString("th-TH", {minimumFractionDigits: 0})
+    : "—";
+}
+
+function calcTotal() {
+  let total = 0;
+  document.querySelectorAll("#items-body tr").forEach(r => {
+    const qty = parseFloat(r.querySelector("[data-f='qty']")?.value) || 0;
+    const price = parseFloat(r.querySelector("[data-f='price']")?.value) || 0;
+    total += qty * price;
+  });
+  document.getElementById("grand-total").textContent =
+    "฿" + total.toLocaleString("th-TH", {minimumFractionDigits: 0});
+}
+
+function getItems() {
+  const items = [];
+  document.querySelectorAll("#items-body tr[id^='row-']").forEach(r => {
+    const id    = r.id.replace("row-", "");
+    const name  = r.querySelector("[data-f='name']")?.value.trim();
+    const qty   = r.querySelector("[data-f='qty']")?.value;
+    const unit  = r.querySelector("[data-f='unit']")?.value.trim();
+    const price = r.querySelector("[data-f='price']")?.value;
+    const desc  = document.getElementById("desc-" + id)?.value.trim() || "";
+    const link  = document.getElementById("link-" + id)?.value.trim() || "";
+    const img   = r.dataset.img || "";
+    if (name) items.push({ name, qty: qty || "1", unit: unit || "-", price: price || "0", desc, link, img });
+  });
+  return items;
+}
+
+
+
+
+// ── submit PR ─────────────────────────────────────────────────
+async function submitPR() {
+  const dept = document.getElementById("f-dept").value;
+  // lineProfile set by LIFF init automatically
+  const date = document.getElementById("f-date").value;
+  const urgency = document.querySelector("input[name='urgency']:checked")?.value || "normal";
+  const note = document.getElementById("f-note").value.trim();
+  const items = getItems();
+
+  if (!dept || !date || items.length === 0) {
+    showToast("error", "กรุณากรอกข้อมูลให้ครบ: แผนก, วันที่ต้องการ และรายการสินค้าอย่างน้อย 1 รายการ");
+    return;
+  }
+
+  const btn = document.getElementById("submit-btn");
+  const btnText = document.getElementById("btn-text");
+  btn.disabled = true;
+  btnText.textContent = "กำลังบันทึก...";
+  hideToasts();
+
+  try {
+    if (!lineProfile.displayName) {
+      showToast("error", "ไม่สามารถดึงชื่อ LINE ได้ กรุณากรอกชื่อในช่องด้านล่าง");
+      btn.disabled = false; btnText.textContent = "ส่ง Purchase Request"; return;
+    }
+    const payload = {
+      action:      "submit",
+      dept,
+      lineUserId:  lineProfile.userId,
+      displayName: lineProfile.displayName,
+      pictureUrl:  lineProfile.pictureUrl,
+      needDate:    date,
+      urgency, note, items
+    };
+    const res = await fetch(CONFIG.WEBHOOK_URL, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "text/plain" }
+    });
+    const result = await res.json();
+
+    if (result.success) {
+      document.getElementById("toast-prid").textContent =
+        result.prId + " · มูลค่ารวม ฿" + (result.total || 0).toLocaleString("th-TH");
+      showToast("success");
+      resetForm();
+    } else {
+      showToast("error", result.error || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+    }
+  } catch (err) {
+    showToast("error", "ไม่สามารถเชื่อมต่อ Google Sheet ได้: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btnText.textContent = "ส่ง Purchase Request";
+  }
+}
+
+function resetForm() {
+  document.getElementById("f-dept").value = "";
+  document.getElementById("f-name").value = "";
+  document.getElementById("f-date").value = "";
+  document.getElementById("f-note").value = "";
+  document.querySelector("input[name='urgency'][value='normal']").checked = true;
+  document.getElementById("items-body").innerHTML = "";
+  document.getElementById("grand-total").textContent = "฿0";
+  rowCount = 0;
+  addRow();
+}
+
+function showToast(type, msg) {
+  hideToasts();
+  if (type === "success") {
+    document.getElementById("toast-success").classList.add("show");
+  } else {
+    document.getElementById("toast-errmsg").textContent = msg;
+    document.getElementById("toast-error").classList.add("show");
+  }
+}
+function hideToasts() {
+  document.getElementById("toast-success").classList.remove("show");
+  document.getElementById("toast-error").classList.remove("show");
+}
+
+// ── admin password ────────────────────────────────────────────
+function checkPass() {
+  const val = document.getElementById("pass-input").value;
+  if (val === CONFIG.ADMIN_PASS) {
+    document.getElementById("pass-gate").style.display = "none";
+    document.getElementById("admin-dash").style.display = "block";
+    loadAdmin();
+  } else {
+    document.getElementById("pass-err").style.display = "block";
+  }
+}
+
+// ── load admin data ───────────────────────────────────────────
+async function loadAdmin() {
+  document.getElementById("loading").classList.add("show");
+  document.getElementById("pr-list").innerHTML = "";
+
+  try {
+    const res = await fetch(CONFIG.WEBHOOK_URL + "?t=" + Date.now());
+    const result = await res.json();
+
+    if (result.success) {
+      allPRs = result.data || [];
+      updateStats();
+      applyFilter();
+    } else {
+      document.getElementById("pr-list").innerHTML =
+        '<div class="empty"><span class="empty-icon">⚠️</span>' + (result.error || "โหลดข้อมูลไม่ได้") + "</div>";
+    }
+  } catch (err) {
+    document.getElementById("pr-list").innerHTML =
+      '<div class="empty"><span class="empty-icon">⚠️</span>ไม่สามารถโหลดข้อมูลได้: ' + err.message + "</div>";
+  } finally {
+    document.getElementById("loading").classList.remove("show");
+  }
+}
+
+function updateStats() {
+  document.getElementById("s-all").textContent     = allPRs.length;
+  document.getElementById("s-pending").textContent  = allPRs.filter(r => r["สถานะ"] === "รอดำเนินการ").length;
+  document.getElementById("s-approved").textContent = allPRs.filter(r => r["สถานะ"]?.includes("อนุมัติ")).length;
+  document.getElementById("s-rejected").textContent = allPRs.filter(r => r["สถานะ"]?.includes("ปฏิเสธ")).length;
+}
+
+function applyFilter() {
+  const fDept   = document.getElementById("f-fdept").value;
+  const fStatus = document.getElementById("f-fstatus").value;
+  const fUrg    = document.getElementById("f-furg").value;
+
+  let filtered = allPRs.filter(r => {
+    if (fDept   && r["แผนก"]        !== fDept)   return false;
+    if (fStatus && r["สถานะ"]       !== fStatus) return false;
+    if (fUrg    && r["ความเร่งด่วน"] !== fUrg)   return false;
+    return true;
+  });
+
+  renderPRs(filtered);
+}
+
+function renderPRs(list) {
+  const container = document.getElementById("pr-list");
+  if (!list.length) {
+    container.innerHTML = '<div class="empty"><span class="empty-icon">📭</span>ไม่มีรายการในขณะนี้</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(pr => {
+    const status    = pr["สถานะ"] || "รอดำเนินการ";
+    const isPending = status === "รอดำเนินการ";
+    const urgRaw    = pr["ความเร่งด่วน"] || "";
+    const urgClass  = urgRaw.includes("เร่งด่วน") ? "urg-urgent" : urgRaw.includes("วิกฤต") ? "urg-critical" : "";
+    const badgeCls  = isPending ? "badge-pending" : status.includes("อนุมัติ") ? "badge-approved" : "badge-rejected";
+    const prId      = pr["PR ID"] || "";
+    const isExp     = expanded[prId];
+    const total     = parseFloat(pr["มูลค่ารวม (฿)"]) || 0;
+    const comment   = pr["comment"] || "";
+
+    // parse items JSON if available, fallback to plain text
+    let itemsData = [];
+    try { itemsData = JSON.parse(pr["รายการสินค้า"] || "[]"); } catch(e) {
+      itemsData = (pr["รายการสินค้า"] || "").split("\n").filter(Boolean)
+        .map(l => ({ name: l.split("(")[0].trim(), qty:"", unit:"", price:"", desc:"", link:"", img:"" }));
+    }
+
+    return `
+      <div class="pr-card ${urgClass}" id="card-${prId}">
+        <div class="pr-top">
+          <div>
+            <div class="pr-id-dept">
+              <span class="pr-id">${prId}</span>
+              <span class="pr-dept">${pr["แผนก"] || "-"}</span>
+            </div>
+            <div class="pr-meta">
+              Line ID: ${pr["Line UserID ผู้ส่ง"] || pr["ผู้ส่ง"] || "-"} · ส่งเมื่อ ${pr["วันที่ส่ง"] || "-"} · ต้องการ ${pr["วันที่ต้องการ"] || "-"}
+              ${urgRaw ? " · " + urgRaw : ""}
+            </div>
+          </div>
+          <span class="badge ${badgeCls}">${status}</span>
+        </div>
+        ${pr["หมายเหตุ"] ? `<div class="pr-note">"${pr["หมายเหตุ"]}"</div>` : ""}
+        <button class="pr-items-toggle" onclick="toggleExpand('${prId}')">
+          ${isExp ? "▲ ซ่อน" : "▼ ดูรายการ"} (${itemsData.length} รายการ · ฿${total.toLocaleString("th-TH")})
+        </button>
+        ${isExp ? `
+          <div class="pr-items-body">
+            ${itemsData.map(it => {
+              const sub = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
+              const hasImg = it.img && it.img.startsWith("data:");
+              return `<div class="pr-item-line" style="flex-direction:column;align-items:flex-start;gap:6px;padding:8px 0">
+                <div style="display:flex;justify-content:space-between;width:100%;align-items:flex-start;gap:8px">
+                  <div style="display:flex;gap:10px;align-items:flex-start">
+                    ${hasImg ? `<img src="${it.img}" class="admin-item-img" alt="${it.name}">` : ""}
+                    <div>
+                      <div style="font-weight:500;font-size:13px;color:var(--text)">${it.name}</div>
+                      <div style="font-size:12px;color:var(--text-3)">${it.qty} ${it.unit}</div>
+                      ${it.desc ? `<div style="font-size:12px;color:var(--text-2);margin-top:2px">${it.desc}</div>` : ""}
+                      ${it.link ? `<a href="${it.link}" target="_blank" class="link-chip">🔗 ลิงก์สั่งซื้อ</a>` : ""}
+                    </div>
+                  </div>
+                  <span style="font-family:var(--mono);font-size:12px;white-space:nowrap">${sub > 0 ? "฿"+sub.toLocaleString("th-TH") : ""}</span>
+                </div>
+              </div>`;
+            }).join('<hr style="border:none;border-top:1px solid var(--border);margin:0">')}
+            <div class="pr-total-line">฿${total.toLocaleString("th-TH")}</div>
+          </div>` : ""}
+        ${isPending ? `
+          <div class="pr-actions">
+            <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ (ไม่บังคับ)">
+            <button class="btn-approve" onclick="updateStatus('${prId}','approved')">✓ อนุมัติ</button>
+            <button class="btn-reject"  onclick="updateStatus('${prId}','rejected')">✗ ปฏิเสธ</button>
+          </div>` : ""}
+        ${comment ? `<div class="pr-comment">💬 ${comment}</div>` : ""}
+      </div>
+    `;
+  }).join("");
+}
+
+function toggleExpand(id) {
+  expanded[id] = !expanded[id];
+  applyFilter();
+}
+
+// ── update status ─────────────────────────────────────────────
+async function updateStatus(prId, status) {
+  const comment = document.getElementById("cmt-" + prId)?.value || "";
+  const payload = {
+    action: "updateStatus",
+    prId,
+    status,
+    comment,
+    adminPass: CONFIG.ADMIN_PASS
+  };
+
+  try {
+    const res = await fetch(CONFIG.WEBHOOK_URL, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "text/plain" }
+    });
+    const result = await res.json();
+    if (result.success) {
+      await loadAdmin();
+    } else {
+      alert("เกิดข้อผิดพลาด: " + result.error);
+    }
+  } catch (err) {
+    alert("ไม่สามารถอัปเดตได้: " + err.message);
+  }
+}
+
+// ── init ──────────────────────────────────────────────────────
+addRow();
+</script>
+</body>
+</html>
