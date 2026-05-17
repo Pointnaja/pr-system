@@ -442,6 +442,37 @@ body {
 }
 .pass-gate button:hover { background: var(--accent-mid); }
 .pass-err { color: var(--danger); font-size: 12px; margin-top: 8px; display: none; }
+/* ─── My PR tab ─── */
+.my-pr-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px 18px; margin-bottom: 10px;
+  transition: box-shadow 0.15s;
+}
+.my-pr-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.my-pr-card.urg-urgent  { border-left: 3px solid #D97706; }
+.my-pr-card.urg-critical { border-left: 3px solid #DC2626; }
+.edit-form { background: var(--bg); border-radius: 8px; padding: 14px; margin-top: 12px; }
+.edit-form .form-grid { grid-template-columns: 1fr 1fr; }
+.edit-items-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.edit-items-table th { font-size: 11px; color: var(--text-3); font-weight: 500;
+  text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border);
+  text-transform: uppercase; letter-spacing: 0.3px; }
+.edit-items-table td { padding: 5px 4px; vertical-align: middle; }
+.edit-items-table input { font-family: var(--sans); font-size: 13px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 5px; padding: 5px 7px; color: var(--text); outline: none;
+  width: 100%; transition: border-color 0.12s; }
+.edit-items-table input:focus { border-color: var(--accent-mid); }
+.save-edit-btn { width: 100%; padding: 10px; background: var(--accent);
+  color: #fff; border: none; border-radius: 7px; font-family: var(--sans);
+  font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 12px;
+  transition: background 0.15s; }
+.save-edit-btn:hover { background: var(--accent-mid); }
+.save-edit-btn:disabled { background: var(--text-3); cursor: not-allowed; }
+.cancel-edit-btn { width: 100%; padding: 8px; background: none;
+  color: var(--text-3); border: 1px solid var(--border); border-radius: 7px;
+  font-family: var(--sans); font-size: 13px; cursor: pointer; margin-top: 6px; }
+
 /* ─── User pill (LIFF profile) ─── */
 .user-pill {
   display: flex; align-items: center; gap: 10px;
@@ -556,6 +587,7 @@ body {
     </div>
     <div class="tab-row">
       <button class="tab active" onclick="switchTab('staff', this)">ส่งคำขอ</button>
+      <button class="tab" onclick="switchTab('myprs', this)">PR ของฉัน</button>
       <button class="tab" onclick="switchTab('admin', this)">Admin</button>
     </div>
   </header>
@@ -647,12 +679,12 @@ body {
               <table class="items-table">
                 <thead>
                   <tr>
-                    <th style="width:30%">ชื่อสินค้า</th>
-                    <th style="width:10%">จำนวน</th>
-                    <th style="width:13%">หน่วย</th>
-                    <th style="width:14%">ราคา/หน่วย (฿)</th>
-                    <th style="width:10%">รวม (฿)</th>
-                    <th style="width:16%">รายละเอียด</th>
+                    <th style="width:38%">ชื่อสินค้า</th>
+                    <th style="width:9%">จำนวน</th>
+                    <th style="width:11%">หน่วย</th>
+                    <th style="width:12%">ราคา/หน่วย (฿)</th>
+                    <th style="width:9%">รวม (฿)</th>
+                    <th style="width:14%">รายละเอียด</th>
                     <th style="width:7%"></th>
                   </tr>
                 </thead>
@@ -685,6 +717,13 @@ body {
         </div>
       </div>
     </div>
+  </div>
+
+
+  <!-- ════ MY PRs VIEW ════ -->
+  <div id="view-myprs" class="view">
+    <div id="myprs-loading" class="loading-bar show">กำลังโหลด PR ของคุณ...</div>
+    <div id="myprs-list"></div>
   </div>
 
   <!-- ════ ADMIN VIEW ════ -->
@@ -767,7 +806,9 @@ const CONFIG = {
 let rowCount   = 0;
 let allPRs     = [];
 let expanded   = {};
-let lineProfile = { userId: "", displayName: "", pictureUrl: "" };
+let lineProfile  = { userId: "", displayName: "", pictureUrl: "" };
+let editMode    = {};   // prId → boolean
+let editedData  = {};   // prId → items array
 
 // ═══════════════════════════════════════════════
 //  LIFF INIT — เหมือน Maintenance Bot เป๊ะ
@@ -815,12 +856,276 @@ async function initLiff() {
 }
 initLiff();
 
+
+// ═══════════════════════════════════════════════════════════════
+//  MY PRs — ดู + แก้ไข PR ของตัวเอง
+// ═══════════════════════════════════════════════════════════════
+let myPRs       = [];
+let myEditMode  = {};   // prId → boolean
+let myEditItems = {};   // prId → items[]
+
+async function loadMyPRs() {
+  if (!lineProfile.userId) return;
+  document.getElementById("myprs-loading").classList.add("show");
+  document.getElementById("myprs-list").innerHTML = "";
+  try {
+    const res    = await fetch(CONFIG.WEBHOOK_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "getMyPRs", userId: lineProfile.userId }),
+      headers: { "Content-Type": "text/plain" },
+    });
+    const result = await res.json();
+    if (result.success) {
+      myPRs = result.data || [];
+      renderMyPRs();
+    } else {
+      document.getElementById("myprs-list").innerHTML =
+        '<div class="empty"><span class="empty-icon">⚠️</span>' + (result.error||"โหลดไม่ได้") + "</div>";
+    }
+  } catch(err) {
+    document.getElementById("myprs-list").innerHTML =
+      '<div class="empty"><span class="empty-icon">⚠️</span>เชื่อมต่อไม่ได้</div>';
+  } finally {
+    document.getElementById("myprs-loading").classList.remove("show");
+  }
+}
+
+function renderMyPRs() {
+  const container = document.getElementById("myprs-list");
+  if (!myPRs.length) {
+    container.innerHTML = '<div class="empty"><span class="empty-icon">📭</span>ยังไม่มี PR ของคุณ</div>';
+    return;
+  }
+  const URGENCY_MAP = { NORMAL:"ปกติ", URGENT:"⚡ เร่งด่วน", CRITICAL:"🔴 วิกฤต" };
+  container.innerHTML = myPRs.map(pr => {
+    const prId     = pr["PR ID"] || "";
+    const status   = pr["สถานะ"] || "";
+    const isPending= status.includes("รอดำเนินการ");
+    const urgRaw   = pr["ความเร่งด่วน"] || "";
+    const urgClass = urgRaw.includes("เร่งด่วน") ? "urg-urgent" : urgRaw.includes("วิกฤต") ? "urg-critical" : "";
+    const badgeCls = isPending ? "badge-pending" : status.includes("อนุมัติ") ? "badge-approved" : "badge-rejected";
+    const total    = parseFloat(pr["มูลค่ารวม (฿)"]) || 0;
+    const isEdit   = myEditMode[prId];
+    const comment  = pr["comment"] || "";
+
+    // parse items
+    let items = [];
+    const jsonCol = pr["รายการ JSON"] || pr["รายการสินค้า"] || "";
+    try {
+      const parsed = JSON.parse(jsonCol);
+      if (Array.isArray(parsed)) items = parsed; else throw new Error();
+    } catch(e) {
+      const plain = pr["รายการสินค้า (สรุป)"] || pr["รายการสินค้า"] || "";
+      items = plain.split("\n").filter(Boolean).map(l => {
+        const nm = l.match(/^(.+?)\s+x(\S+)\s+(\S+)/);
+        const pm = l.match(/฿([\d,]+)/);
+        return { name: nm?nm[1].trim():l, qty: nm?nm[2]:"1", unit: nm?nm[3]:"", price: pm?pm[1].replace(",",""):"0", desc:"", link:"" };
+      });
+    }
+
+    const editItems = myEditItems[prId] || JSON.parse(JSON.stringify(items));
+    const editTotal = editItems.reduce((s,i) => s+(parseFloat(i.qty)||0)*(parseFloat(i.price)||0), 0);
+
+    // urgency value for edit form
+    const urgValue = urgRaw.includes("วิกฤต") ? "critical" : urgRaw.includes("เร่งด่วน") ? "urgent" : "normal";
+
+    return `
+    <div class="my-pr-card ${urgClass}" id="myprc-${prId}">
+      <div class="pr-top">
+        <div>
+          <div class="pr-id-dept">
+            <span class="pr-id">${prId}</span>
+            <span class="pr-dept">${pr["แผนก"] || "-"}</span>
+          </div>
+          <div class="pr-meta">ส่งเมื่อ ${pr["วันที่ส่ง"]||"-"} · ต้องการ ${pr["วันที่ต้องการ"]||"-"} · ${urgRaw}</div>
+        </div>
+        <span class="badge ${badgeCls}">${status}</span>
+      </div>
+      ${comment ? `<div class="pr-comment">💬 ${comment}</div>` : ""}
+
+      ${isEdit ? `
+      <!-- ─── Edit Form ─── -->
+      <div class="edit-form">
+        <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:12px">✏️ แก้ไขข้อมูล</div>
+        <div class="form-grid" style="gap:12px;margin-bottom:12px">
+          <div class="field">
+            <label>วันที่ต้องการ</label>
+            <input type="date" id="edit-date-${prId}" value="${pr["วันที่ต้องการ"]||""}">
+          </div>
+          <div class="field">
+            <label>ความเร่งด่วน</label>
+            <select id="edit-urg-${prId}">
+              <option value="normal"   ${urgValue==="normal"?"selected":""}>ปกติ</option>
+              <option value="urgent"   ${urgValue==="urgent"?"selected":""}>⚡ เร่งด่วน</option>
+              <option value="critical" ${urgValue==="critical"?"selected":""}>🔴 วิกฤต</option>
+            </select>
+          </div>
+          <div class="field span2">
+            <label>หมายเหตุ</label>
+            <textarea id="edit-note-${prId}" rows="2">${pr["หมายเหตุ"]||""}</textarea>
+          </div>
+        </div>
+        <table class="edit-items-table">
+          <thead>
+            <tr>
+              <th style="width:38%">ชื่อสินค้า</th>
+              <th style="width:12%">จำนวน</th>
+              <th style="width:14%">หน่วย</th>
+              <th style="width:16%">ราคา/หน่วย</th>
+              <th style="width:14%">รวม</th>
+              <th style="width:6%"></th>
+            </tr>
+          </thead>
+          <tbody id="edit-items-${prId}">
+            ${editItems.map((it, idx) => {
+              const sub = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
+              return `<tr id="eit-${prId}-${idx}">
+                <td><input type="text" value="${it.name}" oninput="myEditField('${prId}',${idx},'name',this.value)"></td>
+                <td><input type="number" value="${it.qty}" min="0" style="width:60px;text-align:center" oninput="myEditField('${prId}',${idx},'qty',this.value);myRerender('${prId}')"></td>
+                <td><input type="text" value="${it.unit}" style="width:60px;text-align:center" oninput="myEditField('${prId}',${idx},'unit',this.value)"></td>
+                <td><input type="number" value="${it.price}" min="0" step="0.01" style="text-align:right" oninput="myEditField('${prId}',${idx},'price',this.value);myRerender('${prId}')"></td>
+                <td style="text-align:right;font-family:var(--mono);font-size:12px;padding:5px 6px">${sub>0?"฿"+sub.toLocaleString("th-TH"):"-"}</td>
+                <td><button class="del-btn" onclick="myDelItem('${prId}',${idx})" type="button">×</button></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+          <button onclick="myAddItem('${prId}')" style="font-size:13px;color:var(--accent-mid);background:none;border:none;cursor:pointer;font-family:var(--sans);font-weight:500">+ เพิ่มรายการ</button>
+          <span style="font-family:var(--mono);font-weight:500;font-size:14px" id="edit-total-${prId}">รวม ฿${editTotal.toLocaleString("th-TH")}</span>
+        </div>
+        <button class="save-edit-btn" id="save-btn-${prId}" onclick="saveMyEdit('${prId}')">💾 บันทึกการแก้ไข</button>
+        <button class="cancel-edit-btn" onclick="cancelMyEdit('${prId}')">ยกเลิก</button>
+      </div>
+      ` : `
+      <!-- ─── View Mode ─── -->
+      <div style="font-size:13px;color:var(--text-2);margin-top:8px">
+        ${items.map(it => {
+          const sub = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
+          return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+            <span>${it.name} <span style="color:var(--text-3)">${it.qty} ${it.unit}</span></span>
+            <span style="font-family:var(--mono)">${sub>0?"฿"+sub.toLocaleString("th-TH"):""}</span>
+          </div>`;
+        }).join("")}
+        <div style="text-align:right;font-family:var(--mono);font-weight:500;margin-top:8px">฿${total.toLocaleString("th-TH")}</div>
+      </div>
+      ${isPending ? `<button onclick="openMyEdit('${prId}')"
+        style="margin-top:12px;width:100%;padding:9px;border:1px solid var(--border);
+        border-radius:7px;background:none;font-family:var(--sans);font-size:14px;
+        cursor:pointer;color:var(--text-2)">✏️ แก้ไขข้อมูล PR นี้</button>` : ""}
+      `}
+    </div>`;
+  }).join("");
+}
+
+function openMyEdit(prId) {
+  const pr = myPRs.find(r => r["PR ID"] === prId);
+  if (!pr) return;
+  let items = [];
+  const jsonCol = pr["รายการ JSON"] || pr["รายการสินค้า"] || "";
+  try {
+    const parsed = JSON.parse(jsonCol);
+    if (Array.isArray(parsed)) items = JSON.parse(JSON.stringify(parsed)); else throw new Error();
+  } catch(e) {
+    const plain = pr["รายการสินค้า (สรุป)"] || pr["รายการสินค้า"] || "";
+    items = plain.split("\n").filter(Boolean).map(l => {
+      const nm = l.match(/^(.+?)\s+x(\S+)\s+(\S+)/);
+      const pm = l.match(/฿([\d,]+)/);
+      return { name: nm?nm[1].trim():l, qty: nm?nm[2]:"1", unit: nm?nm[3]:"", price: pm?pm[1].replace(",",""):"0", desc:"", link:"" };
+    });
+  }
+  myEditItems[prId] = items;
+  myEditMode[prId]  = true;
+  renderMyPRs();
+}
+
+function cancelMyEdit(prId) {
+  myEditMode[prId]  = false;
+  myEditItems[prId] = null;
+  renderMyPRs();
+}
+
+function myEditField(prId, idx, field, value) {
+  if (!myEditItems[prId]) return;
+  myEditItems[prId][idx][field] = value;
+}
+
+function myRerender(prId) {
+  if (!myEditItems[prId]) return;
+  const items    = myEditItems[prId];
+  const newTotal = items.reduce((s,i) => s+(parseFloat(i.qty)||0)*(parseFloat(i.price)||0), 0);
+  const totalEl  = document.getElementById("edit-total-"+prId);
+  if (totalEl) totalEl.textContent = "รวม ฿" + newTotal.toLocaleString("th-TH");
+}
+
+function myAddItem(prId) {
+  if (!myEditItems[prId]) return;
+  myEditItems[prId].push({ name:"", qty:"1", unit:"ชิ้น", price:"0", desc:"", link:"" });
+  renderMyPRs();
+}
+
+function myDelItem(prId, idx) {
+  if (!myEditItems[prId]) return;
+  myEditItems[prId].splice(idx, 1);
+  renderMyPRs();
+}
+
+async function saveMyEdit(prId) {
+  const pr = myPRs.find(r => r["PR ID"] === prId);
+  if (!pr) return;
+
+  const btn      = document.getElementById("save-btn-"+prId);
+  btn.disabled   = true;
+  btn.textContent = "กำลังบันทึก...";
+
+  const items    = myEditItems[prId] || [];
+  const needDate = document.getElementById("edit-date-"+prId)?.value || "";
+  const urgency  = document.getElementById("edit-urg-"+prId)?.value  || "normal";
+  const note     = document.getElementById("edit-note-"+prId)?.value || "";
+
+  if (!items.length || !items[0].name) {
+    alert("กรุณาใส่รายการสินค้าอย่างน้อย 1 รายการ");
+    btn.disabled = false; btn.textContent = "💾 บันทึกการแก้ไข"; return;
+  }
+
+  try {
+    const payload = {
+      action:      "editPR",
+      prId,
+      lineUserId:  lineProfile.userId,
+      displayName: lineProfile.displayName,
+      dept:        pr["แผนก"] || "",
+      needDate, urgency, note, items,
+    };
+    const res    = await fetch(CONFIG.WEBHOOK_URL, {
+      method: "POST",
+      body:   JSON.stringify(payload),
+      headers: { "Content-Type": "text/plain" },
+    });
+    const result = await res.json();
+    if (result.success) {
+      myEditMode[prId]  = false;
+      myEditItems[prId] = null;
+      await loadMyPRs();   // refresh
+      alert("✅ บันทึกสำเร็จ! ทีม Purchasing ได้รับแจ้งแล้ว");
+    } else {
+      alert("❌ " + (result.error || "บันทึกไม่สำเร็จ"));
+    }
+  } catch(err) {
+    alert("เชื่อมต่อไม่ได้: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "💾 บันทึกการแก้ไข";
+  }
+}
+
 // ── tabs ─────────────────────────────────────────────────────
 function switchTab(tab, btn) {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
   document.getElementById("view-" + tab).classList.add("active");
   btn.classList.add("active");
+  if (tab === "myprs" && lineProfile.userId) loadMyPRs();
 }
 
 // ── items table ──────────────────────────────────────────────
@@ -833,9 +1138,9 @@ function addRow() {
   tr.id = "row-" + id;
   tr.innerHTML = `
     <td><input type="text" placeholder="ชื่อสินค้า" data-f="name" oninput="calcTotal()"></td>
-    <td><input type="number" placeholder="0" min="1" data-f="qty" style="width:64px" oninput="calcRowTotal(${id});calcTotal()"></td>
+    <td><input type="number" placeholder="0" min="1" data-f="qty" style="width:56px" oninput="calcRowTotal(${id});calcTotal()"></td>
     <td><input type="text" placeholder="ชิ้น/กล่อง" data-f="unit" oninput="calcTotal()"></td>
-    <td><input type="number" placeholder="0" min="0" data-f="price" style="width:84px" oninput="calcRowTotal(${id});calcTotal()"></td>
+    <td><input type="number" placeholder="0" min="0" data-f="price" style="width:76px" oninput="calcRowTotal(${id});calcTotal()"></td>
     <td><span id="sub-${id}" style="font-family:var(--mono);font-size:12px;color:var(--text-3)">—</span></td>
     <td style="text-align:center">
       <button class="extra-toggle" id="etbtn-${id}" onclick="toggleExtra(${id})" type="button" title="เพิ่มรูป / คำอธิบาย / ลิงก์">+ ข้อมูล</button>
@@ -980,6 +1285,44 @@ function getItems() {
 
 
 
+
+// ── Edit mode helpers ─────────────────────────────────────────
+function toggleEditMode(prId) {
+  if (editMode[prId]) {
+    // บันทึก — keep editedData แต่ปิด edit mode
+    editMode[prId] = false;
+  } else {
+    // เปิด edit mode — copy items มาแก้
+    const pr = allPRs.find(r => r["PR ID"] === prId);
+    if (!pr) return;
+    let items = [];
+    const jsonCol = pr["รายการ JSON"] || pr["รายการสินค้า"] || "";
+    try {
+      const parsed = JSON.parse(jsonCol);
+      if (Array.isArray(parsed)) items = JSON.parse(JSON.stringify(parsed));
+      else throw new Error();
+    } catch(e) {
+      const plain = pr["รายการสินค้า (สรุป)"] || pr["รายการสินค้า"] || "";
+      items = plain.split("\n").filter(Boolean).map(l => {
+        const nm = l.match(/^(.+?)\s+x(\S+)\s+(\S+)/);
+        const pm = l.match(/฿([\d,]+)/);
+        return { name: nm?nm[1].trim():l, qty: nm?nm[2]:"1", unit: nm?nm[3]:"", price: pm?pm[1].replace(",",""):"0", desc:"", link:"", img:"" };
+      });
+    }
+    editedData[prId] = items;
+    editMode[prId]   = true;
+    expanded[prId]   = true; // auto-expand
+  }
+  applyFilter();
+}
+
+function updateEditItem(prId, idx, field, value) {
+  if (!editedData[prId]) return;
+  editedData[prId][idx][field] = value;
+  // re-render total only (lightweight)
+  applyFilter();
+}
+
 // ── submit PR ─────────────────────────────────────────────────
 async function submitPR() {
   const dept = document.getElementById("f-dept").value;
@@ -1102,9 +1445,9 @@ async function loadAdmin() {
 
 function updateStats() {
   document.getElementById("s-all").textContent     = allPRs.length;
-  document.getElementById("s-pending").textContent  = allPRs.filter(r => r["สถานะ"] === "รอดำเนินการ").length;
-  document.getElementById("s-approved").textContent = allPRs.filter(r => r["สถานะ"]?.includes("อนุมัติ")).length;
-  document.getElementById("s-rejected").textContent = allPRs.filter(r => r["สถานะ"]?.includes("ปฏิเสธ")).length;
+  document.getElementById("s-pending").textContent  = allPRs.filter(r => (r["สถานะ"]||"").includes("รอดำเนินการ")).length;
+  document.getElementById("s-approved").textContent = allPRs.filter(r => (r["สถานะ"]||"").includes("อนุมัติ")).length;
+  document.getElementById("s-rejected").textContent = allPRs.filter(r => (r["สถานะ"]||"").includes("ปฏิเสธ")).length;
 }
 
 function applyFilter() {
@@ -1114,7 +1457,7 @@ function applyFilter() {
 
   let filtered = allPRs.filter(r => {
     if (fDept   && r["แผนก"]        !== fDept)   return false;
-    if (fStatus && r["สถานะ"]       !== fStatus) return false;
+    if (fStatus && !(r["สถานะ"]||'').includes(fStatus)) return false;
     if (fUrg    && r["ความเร่งด่วน"] !== fUrg)   return false;
     return true;
   });
@@ -1130,22 +1473,50 @@ function renderPRs(list) {
   }
 
   container.innerHTML = list.map(pr => {
-    const status    = pr["สถานะ"] || "รอดำเนินการ";
-    const isPending = status === "รอดำเนินการ";
+    const status    = String(pr["สถานะ"] || pr["status"] || "🟡 รอดำเนินการ");
+    const isPending = status.includes("รอดำเนินการ");
     const urgRaw    = pr["ความเร่งด่วน"] || "";
     const urgClass  = urgRaw.includes("เร่งด่วน") ? "urg-urgent" : urgRaw.includes("วิกฤต") ? "urg-critical" : "";
     const badgeCls  = isPending ? "badge-pending" : status.includes("อนุมัติ") ? "badge-approved" : "badge-rejected";
     const prId      = pr["PR ID"] || "";
     const isExp     = expanded[prId];
+    const isEdit    = editMode[prId];
     const total     = parseFloat(pr["มูลค่ารวม (฿)"]) || 0;
     const comment   = pr["comment"] || "";
 
-    // parse items JSON if available, fallback to plain text
+    // ชื่อผู้ส่ง — ตรงกับ Sheet column จริง
+    const senderName = pr["ชื่อ Line"] || pr["ผู้ส่ง"] || "-";
+    const senderId   = pr["Line UserID"] || "-";
+    const needDate   = pr["วันที่ต้องการ"] || "-";
+    const sentDate   = pr["วันที่ส่ง"] || "-";
+
+    // parse items — column "รายการ JSON" (ซ่อนอยู่ใน Sheet แต่ยังส่งมาใน JSON)
     let itemsData = [];
-    try { itemsData = JSON.parse(pr["รายการสินค้า"] || "[]"); } catch(e) {
-      itemsData = (pr["รายการสินค้า"] || "").split("\n").filter(Boolean)
-        .map(l => ({ name: l.split("(")[0].trim(), qty:"", unit:"", price:"", desc:"", link:"", img:"" }));
+    const jsonCol = pr["รายการ JSON"] || pr["รายการสินค้า (สรุป)"] || "";
+    try {
+      const parsed = JSON.parse(jsonCol);
+      if (Array.isArray(parsed)) itemsData = parsed;
+      else throw new Error("not array");
+    } catch(e) {
+      // fallback: parse plain text
+      const plainText = pr["รายการสินค้า (สรุป)"] || pr["รายการสินค้า"] || "";
+      itemsData = plainText.split("\n").filter(Boolean).map(l => {
+        const nameMatch = l.match(/^(.+?)\s+x(\S+)\s+(\S+)/);
+        const priceMatch = l.match(/฿([\d,]+)/);
+        return {
+          name:  nameMatch ? nameMatch[1].trim() : l.split("(")[0].trim(),
+          qty:   nameMatch ? nameMatch[2] : "",
+          unit:  nameMatch ? nameMatch[3] : "",
+          price: priceMatch ? priceMatch[1].replace(",","") : "",
+          desc:  "", link: "", img: ""
+        };
+      });
     }
+
+    // คำนวณ total จาก items ที่แก้ไขแล้ว (ถ้ามี)
+    const editedItems  = editedData[prId] || itemsData;
+    const editedTotal  = editedItems.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.price)||0), 0);
+    const displayTotal = isEdit ? editedTotal : total;
 
     return `
       <div class="pr-card ${urgClass}" id="card-${prId}">
@@ -1156,49 +1527,109 @@ function renderPRs(list) {
               <span class="pr-dept">${pr["แผนก"] || "-"}</span>
             </div>
             <div class="pr-meta">
-              Line ID: ${pr["Line UserID ผู้ส่ง"] || pr["ผู้ส่ง"] || "-"} · ส่งเมื่อ ${pr["วันที่ส่ง"] || "-"} · ต้องการ ${pr["วันที่ต้องการ"] || "-"}
+              👤 ${senderName} · ส่งเมื่อ ${sentDate} · ต้องการ ${needDate}
               ${urgRaw ? " · " + urgRaw : ""}
             </div>
           </div>
           <span class="badge ${badgeCls}">${status}</span>
         </div>
         ${pr["หมายเหตุ"] ? `<div class="pr-note">"${pr["หมายเหตุ"]}"</div>` : ""}
+
+        <!-- Toggle รายการ -->
         <button class="pr-items-toggle" onclick="toggleExpand('${prId}')">
-          ${isExp ? "▲ ซ่อน" : "▼ ดูรายการ"} (${itemsData.length} รายการ · ฿${total.toLocaleString("th-TH")})
+          ${isExp ? "▲ ซ่อน" : "▼ ดูรายการ"} (${(isEdit?editedItems:itemsData).length} รายการ · ฿${displayTotal.toLocaleString("th-TH")})
         </button>
+
         ${isExp ? `
-          <div class="pr-items-body">
-            ${itemsData.map(it => {
-              const sub = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
-              const hasImg = it.img && it.img.startsWith("data:");
-              return `<div class="pr-item-line" style="flex-direction:column;align-items:flex-start;gap:6px;padding:8px 0">
-                <div style="display:flex;justify-content:space-between;width:100%;align-items:flex-start;gap:8px">
-                  <div style="display:flex;gap:10px;align-items:flex-start">
-                    ${hasImg ? `<img src="${it.img}" class="admin-item-img" alt="${it.name}">` : ""}
-                    <div>
-                      <div style="font-weight:500;font-size:13px;color:var(--text)">${it.name}</div>
-                      <div style="font-size:12px;color:var(--text-3)">${it.qty} ${it.unit}</div>
-                      ${it.desc ? `<div style="font-size:12px;color:var(--text-2);margin-top:2px">${it.desc}</div>` : ""}
-                      ${it.link ? `<a href="${it.link}" target="_blank" class="link-chip">🔗 ลิงก์สั่งซื้อ</a>` : ""}
-                    </div>
-                  </div>
-                  <span style="font-family:var(--mono);font-size:12px;white-space:nowrap">${sub > 0 ? "฿"+sub.toLocaleString("th-TH") : ""}</span>
+        <div class="pr-items-body">
+          ${isEdit ? `
+          <!-- Edit Mode -->
+          <div style="font-size:11px;color:var(--text-3);font-weight:500;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px">✏️ แก้ไขรายการ</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border)">สินค้า</th>
+                <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:60px">จำนวน</th>
+                <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:60px">หน่วย</th>
+                <th style="text-align:right;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:80px">ราคา/หน่วย</th>
+                <th style="text-align:right;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:80px">รวม</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${editedItems.map((it, idx) => {
+                const sub = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
+                return `<tr>
+                  <td style="padding:5px 6px">
+                    <div style="font-weight:500">${it.name}</div>
+                    ${it.desc ? `<div style="font-size:11px;color:var(--text-3)">${it.desc}</div>` : ""}
+                  </td>
+                  <td style="padding:5px 4px">
+                    <input type="number" value="${it.qty}" min="0" step="1"
+                      style="width:100%;text-align:center;border:1px solid var(--border);border-radius:4px;padding:4px;font-size:12px"
+                      oninput="updateEditItem('${prId}',${idx},'qty',this.value)">
+                  </td>
+                  <td style="padding:5px 4px">
+                    <input type="text" value="${it.unit}"
+                      style="width:100%;text-align:center;border:1px solid var(--border);border-radius:4px;padding:4px;font-size:12px"
+                      oninput="updateEditItem('${prId}',${idx},'unit',this.value)">
+                  </td>
+                  <td style="padding:5px 4px">
+                    <input type="number" value="${it.price}" min="0" step="0.01"
+                      style="width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;padding:4px;font-size:12px"
+                      oninput="updateEditItem('${prId}',${idx},'price',this.value)">
+                  </td>
+                  <td style="padding:5px 6px;text-align:right;font-family:var(--mono);font-size:12px">
+                    ${sub > 0 ? "฿"+sub.toLocaleString("th-TH") : "-"}
+                  </td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+          <div style="display:flex;justify-content:flex-end;padding:8px 6px 4px;border-top:1px solid var(--border);margin-top:6px">
+            <span style="font-family:var(--mono);font-weight:500;font-size:14px">รวม ฿${editedTotal.toLocaleString("th-TH")}</span>
+          </div>
+          ` : `
+          <!-- View Mode -->
+          ${itemsData.map(it => {
+            const sub = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
+            const hasImg = it.img && it.img.startsWith("data:");
+            return `<div class="pr-item-line" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+              <div style="display:flex;gap:10px;align-items:flex-start">
+                ${hasImg ? `<img src="${it.img}" class="admin-item-img" alt="${it.name}">` : ""}
+                <div>
+                  <div style="font-weight:500;font-size:13px;color:var(--text)">${it.name}</div>
+                  <div style="font-size:12px;color:var(--text-3)">${it.qty} ${it.unit}</div>
+                  ${it.desc ? `<div style="font-size:12px;color:var(--text-2);margin-top:2px">${it.desc}</div>` : ""}
+                  ${it.link ? `<a href="${it.link}" target="_blank" class="link-chip">🔗 ลิงก์</a>` : ""}
                 </div>
-              </div>`;
-            }).join('<hr style="border:none;border-top:1px solid var(--border);margin:0">')}
-            <div class="pr-total-line">฿${total.toLocaleString("th-TH")}</div>
-          </div>` : ""}
+              </div>
+              <span style="font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--text-2)">${sub > 0 ? "฿"+sub.toLocaleString("th-TH") : "-"}</span>
+            </div>`;
+          }).join("")}
+          <div class="pr-total-line">฿${total.toLocaleString("th-TH")}</div>
+          `}
+        </div>` : ""}
+
+        <!-- Action buttons -->
         ${isPending ? `
-          <div class="pr-actions">
-            <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ (ไม่บังคับ)">
-            <button class="btn-approve" onclick="updateStatus('${prId}','approved')">✓ อนุมัติ</button>
-            <button class="btn-reject"  onclick="updateStatus('${prId}','rejected')">✗ ปฏิเสธ</button>
-          </div>` : ""}
+        <div class="pr-actions" style="flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ / เหตุผล (ไม่บังคับ)" style="flex:1;min-width:200px">
+          <button class="btn-approve" onclick="updateStatus('${prId}','approved')">✓ อนุมัติ</button>
+          <button class="btn-reject"  onclick="updateStatus('${prId}','rejected')">✗ ปฏิเสธ</button>
+          <button onclick="toggleEditMode('${prId}')"
+            style="padding:7px 12px;border-radius:6px;border:1px solid var(--border);
+            background:${isEdit?'var(--accent-light)':'var(--bg)'};
+            font-family:var(--sans);font-size:13px;cursor:pointer;color:var(--text-2)">
+            ${isEdit ? "✓ บันทึกการแก้ไข" : "✏️ แก้ไขรายการ"}
+          </button>
+        </div>` : ""}
+
         ${comment ? `<div class="pr-comment">💬 ${comment}</div>` : ""}
       </div>
     `;
   }).join("");
 }
+
 
 function toggleExpand(id) {
   expanded[id] = !expanded[id];
