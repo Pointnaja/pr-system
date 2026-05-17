@@ -1517,11 +1517,12 @@ async function loadAdmin() {
 }
 
 function updateStats() {
-  document.getElementById("s-all").textContent      = allPRs.length;
-  document.getElementById("s-ordered").textContent  = allPRs.filter(r => (r["สถานะ"]||"").includes("สั่งแล้ว") || (r["สถานะ"]||"").includes("รอของ")).length;
-  document.getElementById("s-pending").textContent  = allPRs.filter(r => (r["สถานะ"]||"").includes("รอดำเนินการ")).length;
-  document.getElementById("s-approved").textContent = allPRs.filter(r => (r["สถานะ"]||"").includes("อนุมัติ")).length;
-  document.getElementById("s-rejected").textContent = allPRs.filter(r => (r["สถานะ"]||"").includes("ปฏิเสธ")).length;
+  const safe = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  safe("s-all",     allPRs.length);
+  safe("s-pending",  allPRs.filter(r => (r["สถานะ"]||"").includes("รอดำเนินการ")).length);
+  safe("s-ordered",  allPRs.filter(r => (r["สถานะ"]||"").includes("สั่งแล้ว") || (r["สถานะ"]||"").includes("รอของ")).length);
+  safe("s-approved", allPRs.filter(r => (r["สถานะ"]||"").includes("สำเร็จ")).length);
+  safe("s-rejected", allPRs.filter(r => (r["สถานะ"]||"").includes("ปฏิเสธ")).length);
 }
 
 function applyFilter() {
