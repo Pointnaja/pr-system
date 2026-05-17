@@ -634,13 +634,39 @@ body {
             <div id="liff-loading" class="liff-loading">
               <span>⏳</span><span>กำลังดึงข้อมูล LINE...</span>
             </div>
-            <!-- fallback: ถ้าเปิดนอก LINE / dev mode -->
+            <!-- ปุ่ม Login กรณีเปิดใน browser -->
+            <div id="browser-login" style="display:none;flex-direction:column;gap:10px">
+              <div style="background:var(--accent-light);border:1px solid var(--border);
+                border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text-2);line-height:1.6">
+                🌐 เปิดจาก browser — กรุณา Login ด้วย LINE เพื่อดึงชื่ออัตโนมัติ<br>
+                <span style="font-size:12px;color:var(--text-3)">หรือกรอกชื่อด้านล่างถ้าไม่ต้องการ Login</span>
+              </div>
+              <button onclick="loginWithLine()"
+                style="display:flex;align-items:center;justify-content:center;gap:10px;
+                width:100%;padding:11px;background:#06C755;color:#fff;border:none;
+                border-radius:8px;font-family:var(--sans);font-size:15px;font-weight:500;
+                cursor:pointer;transition:background 0.15s">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                  <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+                </svg>
+                Login ด้วย LINE
+              </button>
+              <div style="display:flex;align-items:center;gap:10px;margin:4px 0">
+                <div style="flex:1;height:1px;background:var(--border)"></div>
+                <span style="font-size:12px;color:var(--text-3)">หรือ</span>
+                <div style="flex:1;height:1px;background:var(--border)"></div>
+              </div>
+              <div class="field">
+                <label>กรอกชื่อแทน</label>
+                <input id="f-name" type="text" placeholder="ชื่อ-นามสกุล"
+                  autocomplete="off" oninput="lineProfile.displayName=this.value.trim();lineProfile.userId='manual-'+Date.now()">
+              </div>
+            </div>
+
+            <!-- fallback: dev mode -->
             <div id="liff-fallback" style="display:none">
-              <input id="f-name" type="text" placeholder="ชื่อ-นามสกุล (กรณีเปิดนอก LINE)"
-                autocomplete="off" oninput="lineProfile.displayName=this.value.trim()">
-              <span style="font-size:11px;color:var(--text-3);margin-top:4px;display:block">
-                💡 กรุณาเปิดผ่าน LINE เพื่อดึงชื่ออัตโนมัติ
-              </span>
+              <input id="f-name-fallback" type="text" placeholder="ชื่อ-นามสกุล"
+                autocomplete="off" oninput="lineProfile.displayName=this.value.trim();lineProfile.userId='dev'">
             </div>
           </div>
 
@@ -817,43 +843,73 @@ async function initLiff() {
   try {
     await liff.init({ liffId: CONFIG.LIFF_ID });
 
-    if (!liff.isLoggedIn()) {
-      liff.login({ redirectUri: location.href });
-      return;
-    }
+    if (liff.isInClient()) {
+      // ── เปิดใน LINE App ──
+      if (!liff.isLoggedIn()) {
+        liff.login({ redirectUri: location.href });
+        return;
+      }
+      const profile = await liff.getProfile();
+      lineProfile = {
+        userId:      profile.userId,
+        displayName: profile.displayName,
+        pictureUrl:  profile.pictureUrl || "",
+      };
+      showUserPill(profile.displayName, profile.pictureUrl);
 
-    const profile = await liff.getProfile();
-    lineProfile = {
-      userId:      profile.userId,
-      displayName: profile.displayName,
-      pictureUrl:  profile.pictureUrl || "",
-    };
-
-    // แสดง user pill
-    const pill    = document.getElementById("user-pill");
-    const pillAvt = document.getElementById("user-pill-avatar");
-    const pillNm  = document.getElementById("user-pill-name");
-
-    if (profile.pictureUrl) {
-      pillAvt.innerHTML = `<img src="${profile.pictureUrl}" alt="${profile.displayName}">`;
     } else {
-      pillAvt.textContent = profile.displayName.charAt(0).toUpperCase();
+      // ── เปิดนอก LINE (browser ปกติ) ──
+      if (!liff.isLoggedIn()) {
+        // ไม่ redirect อัตโนมัติ — แสดงปุ่ม Login แทน
+        showBrowserLoginPrompt();
+        return;
+      }
+      // ถ้า login แล้ว (redirect กลับมา)
+      const profile = await liff.getProfile();
+      lineProfile = {
+        userId:      profile.userId,
+        displayName: profile.displayName,
+        pictureUrl:  profile.pictureUrl || "",
+      };
+      showUserPill(profile.displayName, profile.pictureUrl);
     }
-    pillNm.textContent = profile.displayName;
-
-    document.getElementById("liff-loading").style.display = "none";
-    document.getElementById("liff-fallback").style.display = "none";
-    pill.style.display = "flex";
 
   } catch (e) {
-    // dev mode / เปิดนอก LINE
-    console.log("LIFF dev mode:", e.message);
+    console.log("LIFF error:", e.message);
+    // fallback สำหรับ dev / network error
     document.getElementById("liff-loading").style.display = "none";
     document.getElementById("liff-fallback").style.display = "block";
-    // ใช้ชื่อที่กรอกแทน
     lineProfile = { userId: "dev", displayName: "", pictureUrl: "" };
   }
 }
+
+function showUserPill(displayName, pictureUrl) {
+  const pill    = document.getElementById("user-pill");
+  const pillAvt = document.getElementById("user-pill-avatar");
+  const pillNm  = document.getElementById("user-pill-name");
+
+  if (pictureUrl) {
+    pillAvt.innerHTML = `<img src="${pictureUrl}" alt="${displayName}">`;
+  } else {
+    pillAvt.textContent = displayName.charAt(0).toUpperCase();
+  }
+  pillNm.textContent = displayName;
+
+  document.getElementById("liff-loading").style.display   = "none";
+  document.getElementById("liff-fallback").style.display  = "none";
+  document.getElementById("browser-login").style.display  = "none";
+  pill.style.display = "flex";
+}
+
+function showBrowserLoginPrompt() {
+  document.getElementById("liff-loading").style.display       = "none";
+  document.getElementById("browser-login").style.display      = "flex";
+}
+
+function loginWithLine() {
+  liff.login({ redirectUri: location.href });
+}
+
 initLiff();
 
 
@@ -1344,9 +1400,16 @@ async function submitPR() {
   hideToasts();
 
   try {
+    // ถ้ายังไม่มีชื่อ — เช็ค fallback input
     if (!lineProfile.displayName) {
-      showToast("error", "ไม่สามารถดึงชื่อ LINE ได้ กรุณากรอกชื่อในช่องด้านล่าง");
-      btn.disabled = false; btnText.textContent = "ส่ง Purchase Request"; return;
+      const fn = document.getElementById("f-name") || document.getElementById("f-name-fallback");
+      if (fn && fn.value.trim()) {
+        lineProfile.displayName = fn.value.trim();
+        lineProfile.userId = lineProfile.userId || "manual";
+      } else {
+        showToast("error", "กรุณา Login ด้วย LINE หรือกรอกชื่อก่อนส่ง");
+        btn.disabled = false; btnText.textContent = "ส่ง Purchase Request"; return;
+      }
     }
     const payload = {
       action:      "submit",
