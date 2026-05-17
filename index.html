@@ -570,7 +570,7 @@ body {
 
 @media (max-width: 600px) {
   .form-grid { grid-template-columns: 1fr; }
-  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .tab { font-size: 12px; padding: 5px 10px; }
   .item-extra.open { grid-template-columns: 1fr; }
 }
@@ -775,11 +775,15 @@ body {
           <div class="stat-num" id="s-all">—</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">รอดำเนินการ</div>
+          <div class="stat-label">🟡 รอดำเนินการ</div>
           <div class="stat-num s-pending" id="s-pending">—</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">สำเร็จ</div>
+          <div class="stat-label">🛒 สั่งแล้ว/รอของ</div>
+          <div class="stat-num" id="s-ordered" style="color:#7B3FBE">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">✅ สำเร็จ</div>
           <div class="stat-num s-approved" id="s-approved">—</div>
         </div>
         <div class="stat-card">
