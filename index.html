@@ -1686,19 +1686,40 @@ function renderPRs(list) {
         </div>` : ""}
 
         <!-- Action buttons -->
-        ${(()=>{
-          const canAct = isPending || status.includes("รับทราบ") || status.includes("สั่งแล้ว") || status.includes("รอของ");
+        ${(() => {
+          const canAct = isPending
+            || status.includes("รับทราบ")
+            || status.includes("สั่งแล้ว")
+            || status.includes("รอของ");
           if (!canAct) return "";
+
+          const btnAck  = isPending
+            ? `<button onclick="updateStatus('${prId}','acknowledged')" style="padding:6px 12px;border-radius:6px;border:1px solid #90CAF9;background:#E3F2FD;font-family:var(--sans);font-size:13px;font-weight:500;color:#0077B6;cursor:pointer">👀 รับทราบ</button>`
+            : "";
+          const btnOrd  = (isPending || status.includes("รับทราบ"))
+            ? `<button onclick="updateStatus('${prId}','ordered')" style="padding:6px 12px;border-radius:6px;border:1px solid #CE93D8;background:#F3E5F5;font-family:var(--sans);font-size:13px;font-weight:500;color:#7B3FBE;cursor:pointer">🛒 สั่งแล้ว</button>`
+            : "";
+          const btnWait = status.includes("สั่งแล้ว")
+            ? `<button onclick="updateStatus('${prId}','waiting')" style="padding:6px 12px;border-radius:6px;border:1px solid #FFCC80;background:#FFF3E0;font-family:var(--sans);font-size:13px;font-weight:500;color:#E65100;cursor:pointer">⏳ รอของ</button>`
+            : "";
+          const btnDone = (status.includes("สั่งแล้ว") || status.includes("รอของ"))
+            ? `<button class="btn-approve" onclick="updateStatus('${prId}','done')">✅ สำเร็จ</button>`
+            : "";
+          const btnRej  = (!status.includes("ปฏิเสธ") && !status.includes("สำเร็จ"))
+            ? `<button class="btn-reject" onclick="updateStatus('${prId}','rejected')">✗ ปฏิเสธ</button>`
+            : "";
+          const btnEdit = `<button onclick="toggleEditMode('${prId}')"
+            style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);
+            background:${isEdit ? 'var(--accent-light)' : 'var(--bg)'};
+            font-family:var(--sans);font-size:13px;cursor:pointer;color:var(--text-2)">
+            ${isEdit ? "✓ บันทึก" : "✏️ แก้ไขรายการ"}</button>`;
+
           return `<div class="pr-actions" style="flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
             <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ (ไม่บังคับ)" style="flex:1;min-width:160px">
             <div style="display:flex;gap:6px;flex-wrap:wrap">
-              ${isPending ? '<button onclick="updateStatus(''+prId+'','acknowledged')" style="padding:6px 12px;border-radius:6px;border:1px solid #90CAF9;background:#E3F2FD;font-family:var(--sans);font-size:13px;font-weight:500;color:#0077B6;cursor:pointer">👀 รับทราบ</button>' : ""}
-              ${isPending||status.includes("รับทราบ") ? '<button onclick="updateStatus(''+prId+'','ordered')" style="padding:6px 12px;border-radius:6px;border:1px solid #CE93D8;background:#F3E5F5;font-family:var(--sans);font-size:13px;font-weight:500;color:#7B3FBE;cursor:pointer">🛒 สั่งแล้ว</button>' : ""}
-              ${status.includes("สั่งแล้ว") ? '<button onclick="updateStatus(''+prId+'','waiting')" style="padding:6px 12px;border-radius:6px;border:1px solid #FFCC80;background:#FFF3E0;font-family:var(--sans);font-size:13px;font-weight:500;color:#E65100;cursor:pointer">⏳ รอของ</button>' : ""}
-              ${status.includes("สั่งแล้ว")||status.includes("รอของ") ? '<button class="btn-approve" onclick="updateStatus(''+prId+'','done')">✅ สำเร็จ</button>' : ""}
-              ${!status.includes("ปฏิเสธ")&&!status.includes("สำเร็จ") ? '<button class="btn-reject" onclick="updateStatus(''+prId+'','rejected')">✗ ปฏิเสธ</button>' : ""}
+              ${btnAck}${btnOrd}${btnWait}${btnDone}${btnRej}
             </div>
-            <button onclick="toggleEditMode('${prId}')" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:${isEdit?'var(--accent-light)':'var(--bg)'};font-family:var(--sans);font-size:13px;cursor:pointer;color:var(--text-2)">${isEdit?"✓ บันทึก":"✏️ แก้ไขรายการ"}</button>
+            ${btnEdit}
           </div>`;
         })()}
         ${comment ? `<div class="pr-comment">💬 ${comment}</div>` : ""}
