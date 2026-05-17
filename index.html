@@ -275,7 +275,7 @@ body {
 /* ─── Admin ─── */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 10px;
   margin-bottom: 20px;
 }
@@ -342,7 +342,10 @@ body {
 }
 .badge-pending  { background: var(--warn-bg);    color: var(--warn); }
 .badge-approved { background: var(--success-bg); color: var(--success); }
-.badge-rejected { background: var(--danger-bg);  color: var(--danger); }
+.badge-rejected     { background: var(--danger-bg);  color: var(--danger); }
+.badge-acknowledged { background: #E3F2FD; color: #0077B6; }
+.badge-ordered      { background: #F3E5F5; color: #7B3FBE; }
+.badge-waiting      { background: #FFF3E0; color: #E65100; }
 
 .pr-note { font-size: 12px; color: var(--text-2); font-style: italic; margin: 6px 0; }
 
@@ -776,7 +779,7 @@ body {
           <div class="stat-num s-pending" id="s-pending">—</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">อนุมัติแล้ว</div>
+          <div class="stat-label">สำเร็จ</div>
           <div class="stat-num s-approved" id="s-approved">—</div>
         </div>
         <div class="stat-card">
@@ -798,9 +801,12 @@ body {
         </select>
         <select id="f-fstatus" onchange="applyFilter()">
           <option value="">ทุกสถานะ</option>
-          <option value="รอดำเนินการ">รอดำเนินการ</option>
-          <option value="✅ อนุมัติแล้ว">อนุมัติแล้ว</option>
-          <option value="❌ ปฏิเสธ">ปฏิเสธ</option>
+          <option value="รอดำเนินการ">🟡 รอดำเนินการ</option>
+          <option value="รับทราบ">👀 รับทราบแล้ว</option>
+          <option value="สั่งแล้ว">🛒 สั่งแล้ว</option>
+          <option value="รอของ">⏳ รอของ</option>
+          <option value="สำเร็จ">✅ สำเร็จ</option>
+          <option value="ปฏิเสธ">❌ ปฏิเสธ</option>
         </select>
         <select id="f-furg" onchange="applyFilter()">
           <option value="">ทุกระดับ</option>
@@ -1507,7 +1513,8 @@ async function loadAdmin() {
 }
 
 function updateStats() {
-  document.getElementById("s-all").textContent     = allPRs.length;
+  document.getElementById("s-all").textContent      = allPRs.length;
+  document.getElementById("s-ordered").textContent  = allPRs.filter(r => (r["สถานะ"]||"").includes("สั่งแล้ว") || (r["สถานะ"]||"").includes("รอของ")).length;
   document.getElementById("s-pending").textContent  = allPRs.filter(r => (r["สถานะ"]||"").includes("รอดำเนินการ")).length;
   document.getElementById("s-approved").textContent = allPRs.filter(r => (r["สถานะ"]||"").includes("อนุมัติ")).length;
   document.getElementById("s-rejected").textContent = allPRs.filter(r => (r["สถานะ"]||"").includes("ปฏิเสธ")).length;
@@ -1540,7 +1547,12 @@ function renderPRs(list) {
     const isPending = status.includes("รอดำเนินการ");
     const urgRaw    = pr["ความเร่งด่วน"] || "";
     const urgClass  = urgRaw.includes("เร่งด่วน") ? "urg-urgent" : urgRaw.includes("วิกฤต") ? "urg-critical" : "";
-    const badgeCls  = isPending ? "badge-pending" : status.includes("อนุมัติ") ? "badge-approved" : "badge-rejected";
+    const badgeCls  = isPending ? "badge-pending"
+      : status.includes("สำเร็จ")  ? "badge-approved"
+      : status.includes("ปฏิเสธ") ? "badge-rejected"
+      : status.includes("สั่งแล้ว") ? "badge-ordered"
+      : status.includes("รอของ")   ? "badge-waiting"
+      : "badge-acknowledged";
     const prId      = pr["PR ID"] || "";
     const isExp     = expanded[prId];
     const isEdit    = editMode[prId];
@@ -1674,19 +1686,21 @@ function renderPRs(list) {
         </div>` : ""}
 
         <!-- Action buttons -->
-        ${isPending ? `
-        <div class="pr-actions" style="flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-          <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ / เหตุผล (ไม่บังคับ)" style="flex:1;min-width:200px">
-          <button class="btn-approve" onclick="updateStatus('${prId}','approved')">✓ อนุมัติ</button>
-          <button class="btn-reject"  onclick="updateStatus('${prId}','rejected')">✗ ปฏิเสธ</button>
-          <button onclick="toggleEditMode('${prId}')"
-            style="padding:7px 12px;border-radius:6px;border:1px solid var(--border);
-            background:${isEdit?'var(--accent-light)':'var(--bg)'};
-            font-family:var(--sans);font-size:13px;cursor:pointer;color:var(--text-2)">
-            ${isEdit ? "✓ บันทึกการแก้ไข" : "✏️ แก้ไขรายการ"}
-          </button>
-        </div>` : ""}
-
+        ${(()=>{
+          const canAct = isPending || status.includes("รับทราบ") || status.includes("สั่งแล้ว") || status.includes("รอของ");
+          if (!canAct) return "";
+          return `<div class="pr-actions" style="flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ (ไม่บังคับ)" style="flex:1;min-width:160px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${isPending ? '<button onclick="updateStatus(''+prId+'','acknowledged')" style="padding:6px 12px;border-radius:6px;border:1px solid #90CAF9;background:#E3F2FD;font-family:var(--sans);font-size:13px;font-weight:500;color:#0077B6;cursor:pointer">👀 รับทราบ</button>' : ""}
+              ${isPending||status.includes("รับทราบ") ? '<button onclick="updateStatus(''+prId+'','ordered')" style="padding:6px 12px;border-radius:6px;border:1px solid #CE93D8;background:#F3E5F5;font-family:var(--sans);font-size:13px;font-weight:500;color:#7B3FBE;cursor:pointer">🛒 สั่งแล้ว</button>' : ""}
+              ${status.includes("สั่งแล้ว") ? '<button onclick="updateStatus(''+prId+'','waiting')" style="padding:6px 12px;border-radius:6px;border:1px solid #FFCC80;background:#FFF3E0;font-family:var(--sans);font-size:13px;font-weight:500;color:#E65100;cursor:pointer">⏳ รอของ</button>' : ""}
+              ${status.includes("สั่งแล้ว")||status.includes("รอของ") ? '<button class="btn-approve" onclick="updateStatus(''+prId+'','done')">✅ สำเร็จ</button>' : ""}
+              ${!status.includes("ปฏิเสธ")&&!status.includes("สำเร็จ") ? '<button class="btn-reject" onclick="updateStatus(''+prId+'','rejected')">✗ ปฏิเสธ</button>' : ""}
+            </div>
+            <button onclick="toggleEditMode('${prId}')" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:${isEdit?'var(--accent-light)':'var(--bg)'};font-family:var(--sans);font-size:13px;cursor:pointer;color:var(--text-2)">${isEdit?"✓ บันทึก":"✏️ แก้ไขรายการ"}</button>
+          </div>`;
+        })()}
         ${comment ? `<div class="pr-comment">💬 ${comment}</div>` : ""}
       </div>
     `;
