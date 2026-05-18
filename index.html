@@ -445,6 +445,62 @@ body {
 }
 .pass-gate button:hover { background: var(--accent-mid); }
 .pass-err { color: var(--danger); font-size: 12px; margin-top: 8px; display: none; }
+
+/* ─── Status Stepper (Admin) ─── */
+.status-stepper {
+  display: flex; align-items: flex-start;
+  padding: 12px 0 4px; overflow-x: auto; scrollbar-width: none;
+}
+.status-stepper::-webkit-scrollbar { display: none; }
+.step-item {
+  display: flex; flex-direction: column; align-items: center;
+  flex: 1; position: relative; min-width: 52px;
+}
+.step-item:not(:last-child)::after {
+  content: ''; position: absolute; top: 12px; left: 50%;
+  width: 100%; height: 2px; background: var(--border); z-index: 0;
+}
+.step-item.step-done:not(:last-child)::after { background: #86EFAC; }
+.step-dot {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; border: 2px solid var(--border);
+  background: var(--surface); position: relative; z-index: 1;
+  transition: all 0.15s;
+}
+.step-item.step-done .step-dot  { background: var(--success); border-color: var(--success); color: #fff; font-size: 12px; }
+.step-item.step-current .step-dot { border-color: var(--accent-mid); background: var(--accent-light); box-shadow: 0 0 0 3px rgba(45,122,94,0.12); }
+.step-label { font-size: 9px; color: var(--text-3); margin-top: 4px; text-align: center; line-height: 1.3; white-space: nowrap; }
+.step-item.step-done .step-label    { color: var(--success); }
+.step-item.step-current .step-label { color: var(--accent); font-weight: 600; }
+.step-action-area {
+  display: flex; gap: 8px; align-items: center;
+  padding-top: 10px; flex-wrap: wrap;
+}
+.step-action-area input[type="text"] {
+  flex: 1; min-width: 130px; font-family: var(--sans); font-size: 13px;
+  padding: 7px 10px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--bg); color: var(--text); outline: none;
+}
+.step-action-area input:focus { border-color: var(--accent-mid); background: #fff; }
+.btn-next-step {
+  padding: 8px 16px; border-radius: 7px; background: var(--accent);
+  border: none; color: #fff; font-family: var(--sans); font-size: 13px;
+  font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.12s;
+}
+.btn-next-step:hover { background: var(--accent-mid); }
+.btn-step-rej {
+  padding: 7px 10px; border-radius: 6px; border: 1px solid #FCA5A5;
+  background: var(--danger-bg); font-family: var(--sans); font-size: 12px;
+  color: var(--danger); cursor: pointer; white-space: nowrap;
+}
+.btn-step-edit, .btn-step-pdf {
+  padding: 6px 11px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg); font-family: var(--sans); font-size: 12px;
+  cursor: pointer; color: var(--text-2); white-space: nowrap;
+}
+.btn-step-edit:hover, .btn-step-pdf:hover { background: var(--accent-light); border-color: var(--accent-mid); color: var(--accent); }
+
 /* ─── My PR tab ─── */
 .my-pr-card {
   background: var(--surface); border: 1px solid var(--border);
@@ -565,8 +621,9 @@ body {
 .admin-item-img {
   width: 52px; height: 52px; object-fit: cover;
   border-radius: 6px; border: 1px solid var(--border);
-  flex-shrink: 0;
+  flex-shrink: 0; cursor: zoom-in; transition: transform 0.15s, opacity 0.15s;
 }
+.admin-item-img:hover { transform: scale(1.08); opacity: 0.88; }
 
 @media (max-width: 600px) {
   .form-grid { grid-template-columns: 1fr; }
@@ -611,14 +668,20 @@ body {
           <div class="field">
             <label>แผนก <span class="req">*</span></label>
             <select id="f-dept">
-              <option value="">— เลือกแผนก —</option>
-              <option>F&amp;B / Kitchen</option>
+              <option value="">— Select Department —</option>
+              <option>Restaurant &amp; Bar</option>
+              <option>Kitchen</option>
               <option>Housekeeping</option>
-              <option>Engineering / Maintenance</option>
-              <option>Front Office</option>
-              <option>Admin / HR</option>
+              <option>Maintenance</option>
+              <option>Reception</option>
+              <option>Shop</option>
               <option>Management</option>
-              <option>ก่อสร้าง / Construction</option>
+              <option>HR</option>
+              <option>Construction</option>
+              <option>Laundry</option>
+              <option>Staff Kitchen</option>
+              <option>House Man</option>
+              <option>Event</option>
             </select>
           </div>
 
@@ -769,6 +832,13 @@ body {
 
     <!-- Admin dashboard (hidden until login) -->
     <div id="admin-dash" style="display:none">
+      <!-- Admin name bar -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:9px 14px;background:var(--accent-light);border:1px solid var(--border);border-radius:8px">
+        <span style="font-size:13px;color:var(--text-2);white-space:nowrap">👤 ดำเนินการโดย:</span>
+        <input id="admin-name-input" placeholder="ชื่อ Admin..." maxlength="40"
+          style="flex:1;max-width:220px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-family:var(--sans);font-size:13px;background:var(--bg);outline:none"
+          oninput="adminName=this.value.trim();localStorage.setItem('vpAdminName',this.value.trim())">
+      </div>
       <div class="stat-grid">
         <div class="stat-card">
           <div class="stat-label">ทั้งหมด</div>
@@ -794,14 +864,20 @@ body {
 
       <div class="filter-bar">
         <select id="f-fdept" onchange="applyFilter()">
-          <option value="">ทุกแผนก</option>
-          <option>F&amp;B / Kitchen</option>
+          <option value="">All Departments</option>
+          <option>Restaurant &amp; Bar</option>
+          <option>Kitchen</option>
           <option>Housekeeping</option>
-          <option>Engineering / Maintenance</option>
-          <option>Front Office</option>
-          <option>Admin / HR</option>
+          <option>Maintenance</option>
+          <option>Reception</option>
+          <option>Shop</option>
           <option>Management</option>
-          <option>ก่อสร้าง / Construction</option>
+          <option>HR</option>
+          <option>Construction</option>
+          <option>Laundry</option>
+          <option>Staff Kitchen</option>
+          <option>House Man</option>
+          <option>Event</option>
         </select>
         <select id="f-fstatus" onchange="applyFilter()">
           <option value="">ทุกสถานะ</option>
@@ -842,6 +918,7 @@ const CONFIG = {
 let rowCount   = 0;
 let allPRs     = [];
 let expanded   = {};
+let adminName  = localStorage.getItem('vpAdminName') || '';
 let lineProfile  = { userId: "", displayName: "", pictureUrl: "" };
 let editMode    = {};   // prId → boolean
 let editedData  = {};   // prId → items array
@@ -922,6 +999,22 @@ function loginWithLine() {
 
 initLiff();
 
+// ─── URL deep-link (from LINE notifications) ───────────────────
+(function() {
+  const p  = new URLSearchParams(location.search);
+  const pr = p.get('pr');
+  const s  = p.get('s');
+  if (!pr) return;
+  window._deepPR     = pr;
+  window._deepStatus = s;
+  // Auto-switch to admin tab
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-admin').classList.add('active');
+  const adminTab = document.querySelector('.tab[onclick*="admin"]');
+  if (adminTab) adminTab.classList.add('active');
+})();
+
 
 // ═══════════════════════════════════════════════════════════════
 //  MY PRs — ดู + แก้ไข PR ของตัวเอง
@@ -963,7 +1056,12 @@ function renderMyPRs() {
     return;
   }
   const URGENCY_MAP = { NORMAL:"ปกติ", URGENT:"⚡ เร่งด่วน", CRITICAL:"🔴 วิกฤต" };
-  container.innerHTML = myPRs.map(pr => {
+  const sortedPRs = [...myPRs].sort((a, b) => {
+    const ai = parseInt((a["PR ID"] || "PR-0").replace("PR-", "")) || 0;
+    const bi = parseInt((b["PR ID"] || "PR-0").replace("PR-", "")) || 0;
+    return bi - ai;
+  });
+  container.innerHTML = sortedPRs.map(pr => {
     const prId     = pr["PR ID"] || "";
     const status   = pr["สถานะ"] || "";
     const isPending= status.includes("รอดำเนินการ");
@@ -1007,6 +1105,7 @@ function renderMyPRs() {
         </div>
         <span class="badge ${badgeCls}">${status}</span>
       </div>
+      ${pr["วันที่คาดว่าของจะถึง"] ? `<div style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;padding:5px 10px;background:#E3F2FD;border-radius:6px;font-size:12px;font-weight:500;color:#0077B6">📦 คาดว่าของจะถึง: ${pr["วันที่คาดว่าของจะถึง"]}</div>` : ""}
       ${comment ? `<div class="pr-comment">💬 ${comment}</div>` : ""}
 
       ${isEdit ? `
@@ -1062,6 +1161,7 @@ function renderMyPRs() {
         </div>
         <button class="save-edit-btn" id="save-btn-${prId}" onclick="saveMyEdit('${prId}')">💾 บันทึกการแก้ไข</button>
         <button class="cancel-edit-btn" onclick="cancelMyEdit('${prId}')">ยกเลิก</button>
+        <button class="btn-step-pdf" onclick="printMyPR('${prId}')" style="margin-top:6px;width:100%">📄 ดาวน์โหลด PDF</button>
       </div>
       ` : `
       <!-- ─── View Mode ─── -->
@@ -1355,8 +1455,9 @@ function getItems() {
 // ── Edit mode helpers ─────────────────────────────────────────
 function toggleEditMode(prId) {
   if (editMode[prId]) {
-    // บันทึก — keep editedData แต่ปิด edit mode
     editMode[prId] = false;
+    adminSaveEdit(prId);
+    return;
   } else {
     // เปิด edit mode — copy items มาแก้
     const pr = allPRs.find(r => r["PR ID"] === prId);
@@ -1485,6 +1586,9 @@ function checkPass() {
   if (val === CONFIG.ADMIN_PASS) {
     document.getElementById("pass-gate").style.display = "none";
     document.getElementById("admin-dash").style.display = "block";
+    const _sn = localStorage.getItem('vpAdminName') || '';
+    document.getElementById('admin-name-input').value = _sn;
+    adminName = _sn;
     loadAdmin();
   } else {
     document.getElementById("pass-err").style.display = "block";
@@ -1504,6 +1608,7 @@ async function loadAdmin() {
       allPRs = result.data || [];
       updateStats();
       applyFilter();
+      _handleDeepLink();
     } else {
       document.getElementById("pr-list").innerHTML =
         '<div class="empty"><span class="empty-icon">⚠️</span>' + (result.error || "โหลดข้อมูลไม่ได้") + "</div>";
@@ -1541,6 +1646,12 @@ function applyFilter() {
 }
 
 function renderPRs(list) {
+  // Sort newest first
+  list = [...list].sort((a, b) => {
+    const ai = parseInt((a["PR ID"] || "PR-0").replace("PR-", "")) || 0;
+    const bi = parseInt((b["PR ID"] || "PR-0").replace("PR-", "")) || 0;
+    return bi - ai;
+  });
   const container = document.getElementById("pr-list");
   if (!list.length) {
     container.innerHTML = '<div class="empty"><span class="empty-icon">📭</span>ไม่มีรายการในขณะนี้</div>';
@@ -1563,6 +1674,8 @@ function renderPRs(list) {
     const isEdit    = editMode[prId];
     const total     = parseFloat(pr["มูลค่ารวม (฿)"]) || 0;
     const comment   = pr["comment"] || "";
+    const eta       = pr["วันที่คาดว่าของจะถึง"] || "";
+    const updatedBy = pr["ดำเนินการโดย"] || "";
 
     // ชื่อผู้ส่ง — ตรงกับ Sheet column จริง
     const senderName = pr["ชื่อ Line"] || pr["ผู้ส่ง"] || "-";
@@ -1609,6 +1722,8 @@ function renderPRs(list) {
             <div class="pr-meta">
               👤 ${senderName} · ส่งเมื่อ ${sentDate} · ต้องการ ${needDate}
               ${urgRaw ? " · " + urgRaw : ""}
+              ${eta ? ` · <span style="color:#0077B6;font-weight:500">📦 คาดว่าถึง ${eta}</span>` : ""}
+              ${updatedBy ? ` · <span style="color:var(--text-3)">by ${updatedBy}</span>` : ""}
             </div>
           </div>
           <span class="badge ${badgeCls}">${status}</span>
@@ -1675,7 +1790,7 @@ function renderPRs(list) {
             const hasImg = it.img && it.img.startsWith("data:");
             return `<div class="pr-item-line" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
               <div style="display:flex;gap:10px;align-items:flex-start">
-                ${hasImg ? `<img src="${it.img}" class="admin-item-img" alt="${it.name}">` : ""}
+                ${(it.img && (it.img.startsWith('data:') || it.img.startsWith('http'))) ? `<img src="${it.img}" class="admin-item-img" alt="${it.name}" data-fullsrc="${it.img.replace(/"/g,'&quot;')}" onclick="viewImg(this.getAttribute('data-fullsrc'))" title="คลิกเพื่อขยายรูป">` : ""}
                 <div>
                   <div style="font-weight:500;font-size:13px;color:var(--text)">${it.name}</div>
                   <div style="font-size:12px;color:var(--text-3)">${it.qty} ${it.unit}</div>
@@ -1690,44 +1805,54 @@ function renderPRs(list) {
           `}
         </div>` : ""}
 
-        <!-- Action buttons -->
+        <!-- Status Stepper + Actions -->
         ${(() => {
-          const canAct = isPending
-            || status.includes("รับทราบ")
-            || status.includes("สั่งแล้ว")
-            || status.includes("รอของ");
-          if (!canAct) return "";
+          const STEPS = [
+            { th:'รอดำเนินการ', match:'รอดำเนินการ', emoji:'🟡', nextKey:'acknowledged', nextTh:'👀 รับทราบ' },
+            { th:'รับทราบ',    match:'รับทราบ',     emoji:'👀', nextKey:'ordered',      nextTh:'🛒 สั่งแล้ว' },
+            { th:'สั่งแล้ว',  match:'สั่งแล้ว',    emoji:'🛒', nextKey:'waiting',      nextTh:'⏳ รอของ' },
+            { th:'รอของ',      match:'รอของ',        emoji:'⏳', nextKey:'done',         nextTh:'✅ สำเร็จ' },
+            { th:'สำเร็จ',     match:'สำเร็จ',      emoji:'✅', nextKey:null,           nextTh:'' },
+          ];
+          const isRej  = status.includes('ปฏิเสธ');
+          const isDone = status.includes('สำเร็จ');
+          const ci     = isRej ? -1 : STEPS.findIndex(s => status.includes(s.match));
+          const safeI  = ci < 0 ? 0 : ci;
 
-          const btnAck  = isPending
-            ? `<button onclick="updateStatus('${prId}','acknowledged')" style="padding:6px 12px;border-radius:6px;border:1px solid #90CAF9;background:#E3F2FD;font-family:var(--sans);font-size:13px;font-weight:500;color:#0077B6;cursor:pointer">👀 รับทราบ</button>`
-            : "";
-          const btnOrd  = (isPending || status.includes("รับทราบ"))
-            ? `<button onclick="updateStatus('${prId}','ordered')" style="padding:6px 12px;border-radius:6px;border:1px solid #CE93D8;background:#F3E5F5;font-family:var(--sans);font-size:13px;font-weight:500;color:#7B3FBE;cursor:pointer">🛒 สั่งแล้ว</button>`
-            : "";
-          const btnWait = status.includes("สั่งแล้ว")
-            ? `<button onclick="updateStatus('${prId}','waiting')" style="padding:6px 12px;border-radius:6px;border:1px solid #FFCC80;background:#FFF3E0;font-family:var(--sans);font-size:13px;font-weight:500;color:#E65100;cursor:pointer">⏳ รอของ</button>`
-            : "";
-          const btnDone = (status.includes("สั่งแล้ว") || status.includes("รอของ"))
-            ? `<button class="btn-approve" onclick="updateStatus('${prId}','done')">✅ สำเร็จ</button>`
-            : "";
-          const btnRej  = (!status.includes("ปฏิเสธ") && !status.includes("สำเร็จ"))
-            ? `<button class="btn-reject" onclick="updateStatus('${prId}','rejected')">✗ ปฏิเสธ</button>`
-            : "";
-          const btnEdit = `<button onclick="toggleEditMode('${prId}')"
-            style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);
-            background:${isEdit ? 'var(--accent-light)' : 'var(--bg)'};
-            font-family:var(--sans);font-size:13px;cursor:pointer;color:var(--text-2)">
-            ${isEdit ? "✓ บันทึก" : "✏️ แก้ไขรายการ"}</button>`;
+          const dots = STEPS.map((s, i) => {
+            const cls = isRej ? '' : i < safeI ? 'step-done' : i === safeI ? 'step-current' : '';
+            const dot = (!isRej && i < safeI) ? '✓' : s.emoji;
+            return `<div class="step-item ${cls}"><div class="step-dot">${dot}</div><div class="step-label">${s.th}</div></div>`;
+          }).join('');
 
-          return `<div class="pr-actions" style="flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-            <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ (ไม่บังคับ)" style="flex:1;min-width:160px">
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              ${btnAck}${btnOrd}${btnWait}${btnDone}${btnRej}
-            </div>
-            ${btnEdit}
+          const stepper = isRej
+            ? `<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--danger-bg);border-radius:7px;font-size:13px;color:var(--danger);font-weight:500">❌ ปฏิเสธแล้ว${comment ? ' — '+comment : ''}</div>`
+            : `<div class="status-stepper">${dots}</div>`;
+
+          const curStep = !isRej && !isDone ? STEPS[safeI] : null;
+          const actionArea = (curStep && curStep.nextKey)
+            ? `<div class="step-action-area">
+                <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ...">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                  <label style="font-size:11px;color:var(--text-3);white-space:nowrap">📦 คาดว่าของถึง:</label>
+                  <input type="date" id="eta-${prId}" value="${pr['วันที่คาดว่าของจะถึง']||''}"
+                    style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:var(--sans);font-size:12px;background:var(--bg);color:var(--text)">
+                </div>
+                <button class="btn-next-step" onclick="updateStatus('${prId}','${curStep.nextKey}')">${curStep.nextTh} →</button>
+                <button class="btn-step-rej" onclick="updateStatus('${prId}','rejected')">✕ ปฏิเสธ</button>
+              </div>`
+            : '';
+
+          const editBtn = `<button class="btn-step-edit" onclick="toggleEditMode('${prId}')">${isEdit ? '✓ บันทึก' : '✏️ แก้ไขรายการ'}</button>`;
+          const pdfBtn  = `<button class="btn-step-pdf" onclick="printPR('${prId}')">📄 PDF</button>`;
+
+          return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+            ${stepper}
+            ${actionArea}
+            <div style="display:flex;gap:6px;margin-top:8px">${editBtn}${pdfBtn}</div>
           </div>`;
         })()}
-        ${comment ? `<div class="pr-comment">💬 ${comment}</div>` : ""}
+        ${!status.includes('ปฏิเสธ') && comment ? `<div class="pr-comment">💬 ${comment}</div>` : ""}
       </div>
     `;
   }).join("");
@@ -1739,14 +1864,126 @@ function toggleExpand(id) {
   applyFilter();
 }
 
+// ── PDF print ─────────────────────────────────────────────────
+function printPR(prId) {
+  const pr = allPRs.find(p => p["PR ID"] === prId);
+  if (!pr) return;
+  let items = [];
+  try { items = JSON.parse(pr["รายการ JSON"] || "[]"); } catch(e) {}
+  const total = parseFloat(pr["มูลค่ารวม (฿)"]) || 0;
+  const urgRaw = pr["ความเร่งด่วน"] || "";
+  const urgColor = urgRaw.includes("วิกฤต") ? "#DC2626" : urgRaw.includes("เร่งด่วน") ? "#D97706" : "#14532D";
+
+  const rows = items.map(it => {
+    const sub = (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
+    return `<tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee">${it.name}${it.desc ? `<br><span style="font-size:11px;color:#888">${it.desc}</span>` : ""}${it.link ? `<br><a href="${it.link}" style="font-size:11px;color:#0077B6">${it.link}</a>` : ""}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center">${it.qty}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center">${it.unit}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right">${it.price ? "฿"+parseFloat(it.price).toLocaleString("th-TH") : "—"}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:600">${sub > 0 ? "฿"+sub.toLocaleString("th-TH") : "—"}</td>
+    </tr>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html><html lang="th"><head>
+<meta charset="UTF-8">
+<title>PR ${prId} — Viewpoint Resort</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Sarabun', sans-serif; background: #fff; color: #1A1916; font-size: 14px; padding: 40px; max-width: 720px; margin: 0 auto; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1A4A3A; padding-bottom: 16px; margin-bottom: 24px; }
+  .header-left h1 { font-size: 28px; font-weight: 700; color: #1A4A3A; }
+  .header-left .sub { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .header-left .resort { font-size: 12px; color: #666; margin-top: 2px; }
+  .header-right { text-align: right; }
+  .header-right .date-label { font-size: 11px; color: #888; }
+  .header-right .date-val   { font-size: 14px; font-weight: 600; }
+  .status-chip { display: inline-block; margin-top: 8px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #1A4A3A; color: #fff; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; margin-bottom: 20px; font-size: 13px; }
+  .info-row { display: flex; gap: 6px; }
+  .info-label { color: #888; min-width: 100px; }
+  .info-val { font-weight: 600; }
+  .note-box { background: #f8f8f6; border-left: 3px solid #1A4A3A; padding: 8px 12px; border-radius: 0 6px 6px 0; margin-bottom: 20px; font-size: 13px; color: #444; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: #1A4A3A; color: #fff; padding: 10px; text-align: left; font-weight: 600; }
+  thead th:not(:first-child) { text-align: center; }
+  thead th:last-child, thead th:nth-last-child(2) { text-align: right; }
+  tfoot td { padding: 10px; font-size: 15px; font-weight: 700; color: #1A4A3A; }
+  .urg-banner { margin-top: 16px; padding: 8px 12px; border-radius: 7px; font-size: 13px; font-weight: 600; color: ${urgColor}; background: ${urgColor}18; }
+  .comment-box { margin-top: 16px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; }
+  .footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; font-size: 11px; color: #aaa; }
+  .print-btn { position: fixed; bottom: 24px; right: 24px; padding: 12px 22px; background: #1A4A3A; color: #fff; border: none; border-radius: 8px; font-family: 'Sarabun', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+  @media print { .print-btn { display: none; } body { padding: 20px; } }
+</style>
+</head><body>
+<div class="header">
+  <div class="header-left">
+    <div class="sub">Purchase Request</div>
+    <h1>${prId}</h1>
+    <div class="resort">Viewpoint Resort · Koh Tao</div>
+  </div>
+  <div class="header-right">
+    <div class="date-label">วันที่ส่ง</div>
+    <div class="date-val">${pr["วันที่ส่ง"] || "—"}</div>
+    <div class="status-chip">${pr["สถานะ"] || "—"}</div>
+  </div>
+</div>
+
+<div class="info-grid">
+  <div class="info-row"><span class="info-label">🏢 แผนก</span><span class="info-val">${pr["แผนก"] || "—"}</span></div>
+  <div class="info-row"><span class="info-label">👤 ผู้ส่ง</span><span class="info-val">${pr["ชื่อ Line"] || "—"}</span></div>
+  <div class="info-row"><span class="info-label">📅 ต้องการวันที่</span><span class="info-val">${pr["วันที่ต้องการ"] || "—"}</span></div>
+  <div class="info-row"><span class="info-label">⚡ ความเร่งด่วน</span><span class="info-val" style="color:${urgColor}">${urgRaw || "—"}</span></div>
+</div>
+
+${pr["หมายเหตุ"] ? `<div class="note-box">💬 ${pr["หมายเหตุ"]}</div>` : ""}
+
+<table>
+  <thead>
+    <tr>
+      <th>สินค้า</th>
+      <th style="width:70px">จำนวน</th>
+      <th style="width:60px">หน่วย</th>
+      <th style="width:100px">ราคา/หน่วย</th>
+      <th style="width:100px">รวม</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+  <tfoot>
+    <tr>
+      <td colspan="4" style="text-align:right;padding:10px;border-top:2px solid #1A4A3A">มูลค่ารวมทั้งสิ้น</td>
+      <td style="text-align:right;padding:10px;border-top:2px solid #1A4A3A">฿${total.toLocaleString("th-TH")}</td>
+    </tr>
+  </tfoot>
+</table>
+
+${urgRaw && !urgRaw.includes("ปกติ") ? `<div class="urg-banner">${urgRaw} — กรุณาดำเนินการตามความเร่งด่วน</div>` : ""}
+${pr["comment"] ? `<div class="comment-box"><strong>หมายเหตุ Admin:</strong> ${pr["comment"]}</div>` : ""}
+
+<div class="footer">
+  <span>Viewpoint Resort — Purchase Request System</span>
+  <span>พิมพ์เมื่อ ${new Date().toLocaleString("th-TH")}</span>
+</div>
+<button class="print-btn" onclick="window.print()">🖨️ พิมพ์ / บันทึก PDF</button>
+</body></html>`;
+
+  const win = window.open("", "_blank");
+  if (win) { win.document.write(html); win.document.close(); }
+  else showToast("warn", "กรุณาอนุญาต pop-up เพื่อเปิด PDF");
+}
+
 // ── update status ─────────────────────────────────────────────
 async function updateStatus(prId, status) {
-  const comment = document.getElementById("cmt-" + prId)?.value || "";
+  const comment           = document.getElementById("cmt-" + prId)?.value || "";
+  const estimatedArrival  = document.getElementById("eta-" + prId)?.value || "";
   const payload = {
     action: "updateStatus",
     prId,
     status,
     comment,
+    estimatedArrival,
+    updatedBy: adminName || "Admin",
     adminPass: CONFIG.ADMIN_PASS
   };
 
@@ -1767,8 +2004,88 @@ async function updateStatus(prId, status) {
   }
 }
 
+// ── deep-link helpers ─────────────────────────────────────────
+// ── My PRs PDF ────────────────────────────────────────────────
+function printMyPR(prId) {
+  const pr = allPRs.find(p => p["PR ID"] === prId) || myPRs.find(p => p["PR ID"] === prId);
+  if (!pr) { showToast("warn", "โหลดข้อมูลไม่ได้ กรุณาลองใหม่"); return; }
+  if (!allPRs.find(p => p["PR ID"] === prId)) allPRs.push(pr);
+  printPR(prId);
+}
+
+// ── admin save items ──────────────────────────────────────────
+async function adminSaveEdit(prId) {
+  const items = editedData[prId];
+  if (!items || !items.length) { applyFilter(); return; }
+  try {
+    const res = await fetch(CONFIG.WEBHOOK_URL, {
+      method: "POST",
+      body: JSON.stringify({ action:"adminEditItems", prId, items, adminPass:CONFIG.ADMIN_PASS }),
+      headers: { "Content-Type":"text/plain" },
+    });
+    const result = await res.json();
+    if (result.success) {
+      showToast("ok", "✅ บันทึกรายการแล้ว");
+      await loadAdmin();
+    } else {
+      showToast("err", result.error || "บันทึกไม่ได้");
+      editMode[prId] = true; applyFilter();
+    }
+  } catch(err) {
+    showToast("err", "เชื่อมต่อไม่ได้: " + err.message);
+    editMode[prId] = true; applyFilter();
+  }
+}
+
+// ── image lightbox ────────────────────────────────────────────
+function viewImg(src) {
+  const lb  = document.getElementById('img-lightbox');
+  const img = document.getElementById('img-lightbox-img');
+  img.src = src;
+  lb.style.display = 'flex';
+}
+
+function _handleDeepLink() {
+  if (!window._deepPR) return;
+  const prId = window._deepPR;
+  expanded[prId] = true;
+  applyFilter();
+  setTimeout(() => {
+    const el = document.getElementById('card-' + prId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.outline = '2px solid var(--accent-mid)';
+      el.style.transition = 'outline 0.3s';
+      setTimeout(() => { el.style.outline = ''; }, 2500);
+    }
+    if (window._deepStatus) {
+      showQuickConfirm(prId, window._deepStatus);
+    }
+  }, 300);
+}
+
+function showQuickConfirm(prId, status) {
+  const labels = {
+    acknowledged: '👀 รับทราบแล้ว',
+    ordered:      '🛒 สั่งแล้ว',
+    waiting:      '⏳ รอของ',
+    done:         '✅ สำเร็จ',
+    rejected:     '❌ ปฏิเสธ',
+  };
+  const label = labels[status] || status;
+  if (confirm('อัพเดทสถานะ ' + prId + '\nเป็น "' + label + '" ใช่ไหม?')) {
+    updateStatus(prId, status);
+  }
+}
+
 // ── init ──────────────────────────────────────────────────────
 addRow();
 </script>
+<!-- Image Lightbox -->
+<div id="img-lightbox" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out">
+  <img id="img-lightbox-img" style="max-width:92vw;max-height:88vh;border-radius:10px;box-shadow:0 8px 48px rgba(0,0,0,0.6)" alt="">
+  <div onclick="document.getElementById('img-lightbox').style.display='none'"
+    style="position:absolute;top:18px;right:22px;color:#fff;font-size:26px;cursor:pointer;line-height:1;opacity:.85">✕</div>
+</div>
 </body>
 </html>
