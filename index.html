@@ -361,6 +361,7 @@ body {
 .badge-approved { background: var(--success-bg); color: var(--success); }
 .badge-rejected     { background: var(--danger-bg);  color: var(--danger); }
 .badge-acknowledged { background: #E3F2FD; color: #0077B6; }
+.badge-approval     { background: #DBEAFE; color: #1D4ED8; }
 .badge-ordered      { background: #F3E5F5; color: #7B3FBE; }
 .badge-waiting      { background: #FFF3E0; color: #E65100; }
 
@@ -1132,6 +1133,11 @@ const CONFIG = {
   LIFF_ID:         "2010069721-ujqgKNIw",
   WEBHOOK_URL:     "https://script.google.com/macros/s/AKfycbyHn2i50bAojiVhVCBs9eL17LJ0km-FB-8IuYZz7W1F_zFocWe210WCSSjvB1o3ygD8Sw/exec",
   ADMIN_PASS:      "viewpoint2024",
+  // B10: LINE userId ทีมจัดซื้อ/ผู้จัดการ — login LINE แล้วเข้า Admin ได้เลยไม่ต้องใส่รหัส
+  // (ต้องตรงกับ PURCHASING_USER_IDS ในไฟล์ .gs)
+  ADMIN_USER_IDS:  [
+    "U0344d79657dbc4a928b236d268687f20",  // ผู้จัดการ
+  ],
 };
 
 // ── state ──────────────────────────────────────
@@ -1209,6 +1215,18 @@ function showUserPill(displayName, pictureUrl) {
 
   // โหลดประวัติ PR เงียบๆ เพื่อให้ autocomplete ชื่อสินค้าพร้อมใช้ทันที
   loadMyPRs().catch(() => {});
+
+  // B10: ทีมจัดซื้อ/ผู้จัดการ — ข้าม password gate อัตโนมัติ
+  if (CONFIG.ADMIN_USER_IDS.includes(lineProfile.userId)) {
+    document.getElementById("pass-gate").style.display  = "none";
+    document.getElementById("admin-dash").style.display = "block";
+    adminName = lineProfile.displayName;
+    const nameInput = document.getElementById("admin-name-input");
+    nameInput.value = adminName;
+    nameInput.disabled = true;
+    nameInput.title = "ดึงจาก LINE Profile อัตโนมัติ";
+    localStorage.setItem('vpAdminName', adminName);
+  }
 }
 
 function showBrowserLoginPrompt() {
@@ -1319,7 +1337,7 @@ function buildPRTimeline(pr, status) {
 
   // Sub-text per step
   const stepSub = [
-    pr['วันที่ส่ง'] || '',
+    (pr['วันที่ส่ง'] || '') + (status.includes('รออนุมัติ') ? ' · 🔵 รออนุมัติผู้จัดการ (ยอดเกินวงเงิน)' : ''),
     (curStep === 1 && updatedBy) ? 'โดย ' + updatedBy : '',
     (curStep === 2 && updatedBy) ? 'โดย ' + updatedBy : '',
     eta
@@ -1377,10 +1395,11 @@ function renderMyPRs() {
   container.innerHTML = sortedPRs.map(pr => {
     const prId     = pr["PR ID"] || "";
     const status   = pr["สถานะ"] || "";
-    const isPending= status.includes("รอดำเนินการ");
+    const isPending= status.includes("รอดำเนินการ") || status.includes("รออนุมัติ");
     const urgRaw   = pr["ความเร่งด่วน"] || "";
     const urgClass = urgRaw.includes("เร่งด่วน") ? "urg-urgent" : urgRaw.includes("วิกฤต") ? "urg-critical" : "";
-    const badgeCls = isPending ? "badge-pending"
+    const badgeCls = status.includes("รออนุมัติ") ? "badge-approval"
+      : status.includes("รอดำเนินการ") ? "badge-pending"
       : status.includes("สำเร็จ")  ? "badge-approved"
       : status.includes("ปฏิเสธ") ? "badge-rejected"
       : status.includes("สั่งแล้ว") ? "badge-ordered"
@@ -2240,7 +2259,8 @@ function renderPRs(list) {
     const isPending = status.includes("รอดำเนินการ");
     const urgRaw    = pr["ความเร่งด่วน"] || "";
     const urgClass  = urgRaw.includes("เร่งด่วน") ? "urg-urgent" : urgRaw.includes("วิกฤต") ? "urg-critical" : "";
-    const badgeCls  = isPending ? "badge-pending"
+    const badgeCls  = status.includes("รออนุมัติ") ? "badge-approval"
+      : isPending ? "badge-pending"
       : status.includes("สำเร็จ")  ? "badge-approved"
       : status.includes("ปฏิเสธ") ? "badge-rejected"
       : status.includes("สั่งแล้ว") ? "badge-ordered"
@@ -2419,8 +2439,28 @@ function renderPRs(list) {
             { th:'รอของ',      match:'รอของ',        emoji:'⏳', nextKey:'done',         nextTh:'✅ สำเร็จ' },
             { th:'สำเร็จ',     match:'สำเร็จ',      emoji:'✅', nextKey:null,           nextTh:'' },
           ];
-          const isRej  = status.includes('ปฏิเสธ');
-          const isDone = status.includes('สำเร็จ');
+          const isRej      = status.includes('ปฏิเสธ');
+          const isDone     = status.includes('สำเร็จ');
+          const isApproval = status.includes('รออนุมัติ');
+
+          // B9: รออนุมัติ — แสดงปุ่มอนุมัติแทน stepper ปกติ
+          if (isApproval) {
+            return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+              <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#DBEAFE;border-radius:7px;font-size:13px;color:#1D4ED8;font-weight:500">
+                🔵 รออนุมัติ — ยอดรวมเกินวงเงินที่กำหนด ต้องให้ผู้จัดการอนุมัติก่อน
+              </div>
+              <div class="step-action-area">
+                <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ...">
+                <button class="btn-next-step" onclick="updateStatus('${prId}','pending')">✔ อนุมัติ → เข้าคิวจัดซื้อ</button>
+                <button class="btn-step-rej" onclick="updateStatus('${prId}','rejected')">✕ ปฏิเสธ</button>
+              </div>
+              <div style="display:flex;gap:6px;margin-top:8px">
+                <button class="btn-step-edit" onclick="toggleEditMode('${prId}')">${isEdit ? '✓ บันทึก' : '✏️ แก้ไขรายการ'}</button>
+                <button class="btn-step-pdf" onclick="printPR('${prId}')">📄 PDF</button>
+              </div>
+            </div>`;
+          }
+
           const ci     = isRej ? -1 : STEPS.findIndex(s => status.includes(s.match));
           const safeI  = ci < 0 ? 0 : ci;
 
@@ -2599,7 +2639,8 @@ async function updateStatus(prId, status) {
     comment,
     estimatedArrival,
     updatedBy: adminName || "Admin",
-    adminPass: CONFIG.ADMIN_PASS
+    adminPass: CONFIG.ADMIN_PASS,
+    adminUserId: lineProfile.userId || ""
   };
 
   try {
@@ -2635,7 +2676,7 @@ async function adminSaveEdit(prId) {
   try {
     const res = await fetch(CONFIG.WEBHOOK_URL, {
       method: "POST",
-      body: JSON.stringify({ action:"adminEditItems", prId, items, adminPass:CONFIG.ADMIN_PASS }),
+      body: JSON.stringify({ action:"adminEditItems", prId, items, adminPass:CONFIG.ADMIN_PASS, adminUserId: lineProfile.userId || "", updatedBy: adminName || "Admin" }),
       headers: { "Content-Type":"text/plain" },
     });
     const result = await res.json();
