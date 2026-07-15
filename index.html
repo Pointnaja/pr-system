@@ -944,7 +944,7 @@ body {
                     <th style="width:38%">ชื่อสินค้า</th>
                     <th style="width:9%">จำนวน</th>
                     <th style="width:11%">หน่วย</th>
-                    <th style="width:12%">ราคา/หน่วย (฿)</th>
+                    <th style="width:12%">ราคาประเมิน/หน่วย (฿)</th>
                     <th style="width:9%">รวม (฿)</th>
                     <th style="width:14%">รายละเอียด</th>
                     <th style="width:7%"></th>
@@ -1096,7 +1096,7 @@ body {
       <input type="text" id="sh-unit" placeholder="ชิ้น / กล่อง / แกลลอน">
     </div>
     <div class="field span2">
-      <label>ราคา/หน่วย (฿)</label>
+      <label>ราคาประเมิน/หน่วย (฿) — ไม่บังคับ</label>
       <input type="number" id="sh-price" placeholder="0" min="0" step="0.01" inputmode="decimal">
     </div>
     <div class="field span2">
@@ -1274,6 +1274,30 @@ async function loadMyPRs() {
 }
 
 // ── Build vertical timeline HTML for My PRs tab ──
+// ── B5: สถานะรายบรรทัดสินค้า ─────────────────────────────────
+const ITEM_STATUS = {
+  arrived:     { th:"มาแล้ว",   icon:"✅", bg:"#DCFCE7", color:"#14532D" },
+  waiting:     { th:"รอของ",    icon:"⏳", bg:"#FEF3C7", color:"#92400E" },
+  unavailable: { th:"หาไม่ได้", icon:"⛔", bg:"#FEE2E2", color:"#991B1B" },
+};
+
+function itemStatusChip(st) {
+  const s = ITEM_STATUS[st];
+  if (!s) return "";
+  return `<span style="font-size:11px;padding:1px 8px;border-radius:10px;background:${s.bg};color:${s.color};white-space:nowrap">${s.icon} ${s.th}</span>`;
+}
+
+// สรุป "มาแล้ว x/y · หาไม่ได้ n" — คืน "" ถ้ายังไม่มีการติ๊กสถานะเลย
+function itemStatusSummary(items) {
+  if (!Array.isArray(items) || !items.length) return "";
+  if (!items.some(i => i.itemStatus)) return "";
+  const arrived = items.filter(i => i.itemStatus === "arrived").length;
+  const unavail = items.filter(i => i.itemStatus === "unavailable").length;
+  let txt = `มาแล้ว ${arrived}/${items.length}`;
+  if (unavail) txt += ` · หาไม่ได้ ${unavail}`;
+  return txt;
+}
+
 function buildPRTimeline(pr, status) {
   const TLINE = [
     { th:'ส่ง PR แล้ว',   icon:'📋' },
@@ -1462,14 +1486,27 @@ function renderMyPRs() {
       ${buildPRTimeline(pr, status)}
       <!-- ─── Items ─── -->
       <div style="font-size:13px;color:var(--text-2);border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+        ${(() => {
+          const sum = itemStatusSummary(items);
+          return sum ? `<div style="font-size:12px;font-weight:600;color:#9B7330;margin-bottom:6px">📦 ${sum}</div>` : "";
+        })()}
         ${items.map(it => {
-          const sub = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
-          return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
-            <span>${it.name} <span style="color:var(--text-3)">${it.qty} ${it.unit}</span></span>
-            <span style="font-family:var(--mono)">${sub>0?"฿"+sub.toLocaleString("th-TH"):""}</span>
+          const sub    = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
+          const actSub = (parseFloat(it.qty)||0)*(parseFloat(it.actualPrice)||0);
+          return `<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)">
+            <span>${it.name} <span style="color:var(--text-3)">${it.qty} ${it.unit}</span> ${itemStatusChip(it.itemStatus)}</span>
+            <span style="font-family:var(--mono);white-space:nowrap">${actSub>0
+              ? `<span style="color:#9B7330;font-weight:600">฿${actSub.toLocaleString("th-TH")}</span>`
+              : (sub>0?"฿"+sub.toLocaleString("th-TH"):"")}</span>
           </div>`;
         }).join("")}
-        <div style="text-align:right;font-family:var(--mono);font-weight:500;margin-top:8px">฿${total.toLocaleString("th-TH")}</div>
+        ${(() => {
+          const actualTotal = items.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.actualPrice)||0), 0);
+          return `<div style="display:flex;justify-content:flex-end;gap:14px;font-family:var(--mono);font-weight:500;margin-top:8px">
+            <span style="color:var(--text-3);font-weight:400;font-size:12px">ประเมิน ฿${total.toLocaleString("th-TH")}</span>
+            ${actualTotal > 0 ? `<span style="color:#9B7330">จริง ฿${actualTotal.toLocaleString("th-TH")}</span>` : ""}
+          </div>`;
+        })()}
       </div>
       ${status.includes("รอของ") ? `
       <button id="confirm-btn-${prId}" onclick="confirmReceipt('${prId}')"
@@ -2272,7 +2309,10 @@ function renderPRs(list) {
 
         <!-- Toggle รายการ -->
         <button class="pr-items-toggle" onclick="toggleExpand('${prId}')">
-          ${isExp ? "▲ ซ่อน" : "▼ ดูรายการ"} (${(isEdit?editedItems:itemsData).length} รายการ · ฿${displayTotal.toLocaleString("th-TH")})
+          ${isExp ? "▲ ซ่อน" : "▼ ดูรายการ"} (${(isEdit?editedItems:itemsData).length} รายการ · ฿${displayTotal.toLocaleString("th-TH")})${(() => {
+            const sum = itemStatusSummary(itemsData);
+            return sum ? ` <span style="color:#9B7330;font-weight:600">· ${sum}</span>` : "";
+          })()}
         </button>
 
         ${isExp ? `
@@ -2284,15 +2324,15 @@ function renderPRs(list) {
             <thead>
               <tr>
                 <th style="text-align:left;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border)">สินค้า</th>
-                <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:60px">จำนวน</th>
-                <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:60px">หน่วย</th>
-                <th style="text-align:right;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:80px">ราคา/หน่วย</th>
-                <th style="text-align:right;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:80px">รวม</th>
+                <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:52px">จำนวน</th>
+                <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:52px">หน่วย</th>
+                <th style="text-align:right;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:70px">ประเมิน</th>
+                <th style="text-align:right;padding:4px 6px;color:#9B7330;font-weight:600;font-size:11px;border-bottom:1px solid var(--border);width:70px">ราคาจริง</th>
+                <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:92px">สถานะ</th>
               </tr>
             </thead>
             <tbody>
               ${editedItems.map((it, idx) => {
-                const sub = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
                 return `<tr>
                   <td style="padding:5px 6px">
                     <div style="font-weight:500">${it.name}</div>
@@ -2313,35 +2353,60 @@ function renderPRs(list) {
                       style="width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;padding:4px;font-size:12px"
                       oninput="updateEditItem('${prId}',${idx},'price',this.value)">
                   </td>
-                  <td style="padding:5px 6px;text-align:right;font-family:var(--mono);font-size:12px">
-                    ${sub > 0 ? "฿"+sub.toLocaleString("th-TH") : "-"}
+                  <td style="padding:5px 4px">
+                    <input type="number" value="${it.actualPrice || ''}" min="0" step="0.01" placeholder="—"
+                      style="width:100%;text-align:right;border:1px solid var(--gold-border);background:var(--gold-light);border-radius:4px;padding:4px;font-size:12px"
+                      oninput="updateEditItem('${prId}',${idx},'actualPrice',this.value)">
+                  </td>
+                  <td style="padding:5px 4px">
+                    <select style="width:100%;border:1px solid var(--border);border-radius:4px;padding:4px 2px;font-size:11px;font-family:var(--sans);background:var(--surface)"
+                      onchange="updateEditItem('${prId}',${idx},'itemStatus',this.value)">
+                      <option value="" ${!it.itemStatus?"selected":""}>—</option>
+                      <option value="arrived" ${it.itemStatus==="arrived"?"selected":""}>✅ มาแล้ว</option>
+                      <option value="waiting" ${it.itemStatus==="waiting"?"selected":""}>⏳ รอของ</option>
+                      <option value="unavailable" ${it.itemStatus==="unavailable"?"selected":""}>⛔ หาไม่ได้</option>
+                    </select>
                   </td>
                 </tr>`;
               }).join("")}
             </tbody>
           </table>
-          <div style="display:flex;justify-content:flex-end;padding:8px 6px 4px;border-top:1px solid var(--border);margin-top:6px">
-            <span style="font-family:var(--mono);font-weight:500;font-size:14px">รวม ฿${editedTotal.toLocaleString("th-TH")}</span>
-          </div>
+          ${(() => {
+            const actualTotal = editedItems.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.actualPrice)||0), 0);
+            return `<div style="display:flex;justify-content:flex-end;gap:16px;padding:8px 6px 4px;border-top:1px solid var(--border);margin-top:6px;font-family:var(--mono);font-size:13px">
+              <span style="color:var(--text-3)">ประเมิน ฿${editedTotal.toLocaleString("th-TH")}</span>
+              ${actualTotal > 0 ? `<span style="font-weight:600;color:#9B7330">จริง ฿${actualTotal.toLocaleString("th-TH")}</span>` : ""}
+            </div>`;
+          })()}
           ` : `
           <!-- View Mode -->
           ${itemsData.map(it => {
-            const sub = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
-            const hasImg = it.img && it.img.startsWith("data:");
+            const sub    = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
+            const actSub = (parseFloat(it.qty)||0)*(parseFloat(it.actualPrice)||0);
             return `<div class="pr-item-line" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
               <div style="display:flex;gap:10px;align-items:flex-start">
                 ${(it.img && (it.img.startsWith('data:') || it.img.startsWith('http'))) ? `<img src="${it.img}" class="admin-item-img" alt="${it.name}" data-fullsrc="${it.img.replace(/"/g,'&quot;')}" onclick="viewImg(this.getAttribute('data-fullsrc'))" title="คลิกเพื่อขยายรูป">` : ""}
                 <div>
-                  <div style="font-weight:500;font-size:13px;color:var(--text)">${it.name}</div>
+                  <div style="font-weight:500;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">${it.name} ${itemStatusChip(it.itemStatus)}</div>
                   <div style="font-size:12px;color:var(--text-3)">${it.qty} ${it.unit}</div>
                   ${it.desc ? `<div style="font-size:12px;color:var(--text-2);margin-top:2px">${it.desc}</div>` : ""}
                   ${it.link ? `<a href="${it.link}" target="_blank" class="link-chip">🔗 ลิงก์</a>` : ""}
                 </div>
               </div>
-              <span style="font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--text-2)">${sub > 0 ? "฿"+sub.toLocaleString("th-TH") : "-"}</span>
+              <span style="font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--text-2);text-align:right">
+                ${actSub > 0
+                  ? `<span style="color:#9B7330;font-weight:600">฿${actSub.toLocaleString("th-TH")}</span>${sub > 0 ? `<br><span style="font-size:11px;color:var(--text-3)">ประเมิน ฿${sub.toLocaleString("th-TH")}</span>` : ""}`
+                  : (sub > 0 ? "฿"+sub.toLocaleString("th-TH") : "-")}
+              </span>
             </div>`;
           }).join("")}
-          <div class="pr-total-line">฿${total.toLocaleString("th-TH")}</div>
+          ${(() => {
+            const actualTotal = itemsData.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.actualPrice)||0), 0);
+            return `<div class="pr-total-line" style="gap:16px">
+              <span style="color:var(--text-3);font-weight:400">ประเมิน ฿${total.toLocaleString("th-TH")}</span>
+              ${actualTotal > 0 ? `<span style="color:#9B7330">จริง ฿${actualTotal.toLocaleString("th-TH")}</span>` : ""}
+            </div>`;
+          })()}
           `}
         </div>` : ""}
 
