@@ -8,16 +8,19 @@
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
 :root {
-  --bg: #F5F3EE;
+  --bg: #F7F2EA;
   --surface: #FFFFFF;
-  --border: #E2DDD6;
-  --border-strong: #C8C2B8;
-  --text: #1A1916;
-  --text-2: #6B6760;
-  --text-3: #A8A49E;
+  --border: #E4DDD0;
+  --border-strong: #C8BEA8;
+  --text: #1A1814;
+  --text-2: #6B6460;
+  --text-3: #ACA69E;
   --accent: #1A4A3A;
   --accent-light: #E8F0EC;
-  --accent-mid: #2D7A5E;
+  --accent-mid: #2D6A50;
+  --gold: #C4933F;
+  --gold-light: #FDF5E8;
+  --gold-border: #E8C070;
   --warn: #92400E;
   --warn-bg: #FEF3C7;
   --danger: #991B1B;
@@ -51,49 +54,52 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 0 18px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 28px;
+  background: #2D4A3E;
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
 }
 .header-left { display: flex; align-items: center; gap: 12px; }
 .logo {
-  width: 36px; height: 36px;
-  background: var(--accent);
-  border-radius: 8px;
+  width: 38px; height: 38px;
+  background: var(--gold);
+  border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
   color: #fff;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
   letter-spacing: -0.5px;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
-.brand-name { font-size: 15px; font-weight: 600; color: var(--text); }
-.brand-sub  { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+.brand-name { font-size: 15px; font-weight: 600; color: #FFFFFF; }
+.brand-sub  { font-size: 11px; color: rgba(255,255,255,0.52); margin-top: 1px; letter-spacing: 0.2px; }
 
 .tab-row {
   display: flex;
   gap: 2px;
-  background: var(--border);
-  border-radius: 8px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 9px;
   padding: 3px;
 }
 .tab {
-  padding: 6px 16px;
-  border-radius: 6px;
+  padding: 6px 14px;
+  border-radius: 7px;
   border: none;
   background: transparent;
   font-family: var(--sans);
   font-size: 13px;
-  color: var(--text-2);
+  color: rgba(255,255,255,0.6);
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
 }
 .tab.active {
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 500;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  background: var(--gold);
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.22);
 }
 
 /* ─── View switch ─── */
@@ -114,6 +120,15 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  position: relative;
+}
+.card-head::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 24px;
+  width: 32px; height: 2px;
+  background: var(--gold);
+  border-radius: 2px;
 }
 .card-title { font-size: 16px; font-weight: 600; }
 .card-sub   { font-size: 12px; color: var(--text-3); margin-top: 3px; }
@@ -282,6 +297,7 @@ body {
 .stat-card {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-top: 2px solid var(--gold-border);
   border-radius: 10px;
   padding: 14px 16px;
 }
@@ -318,11 +334,12 @@ body {
 .pr-card {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-left: 3px solid var(--gold-border);
   border-radius: 10px;
   padding: 16px 18px;
   transition: box-shadow 0.15s;
 }
-.pr-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.pr-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
 .pr-card.urg-urgent  { border-left: 3px solid #D97706; }
 .pr-card.urg-critical { border-left: 3px solid #DC2626; }
 
@@ -340,7 +357,7 @@ body {
   font-size: 11px; font-weight: 500; padding: 3px 10px;
   border-radius: 20px; white-space: nowrap;
 }
-.badge-pending  { background: var(--warn-bg);    color: var(--warn); }
+.badge-pending  { background: var(--gold-light); color: #9B7330; border: 1px solid var(--gold-border); }
 .badge-approved { background: var(--success-bg); color: var(--success); }
 .badge-rejected     { background: var(--danger-bg);  color: var(--danger); }
 .badge-acknowledged { background: #E3F2FD; color: #0077B6; }
@@ -469,10 +486,10 @@ body {
   transition: all 0.15s;
 }
 .step-item.step-done .step-dot  { background: var(--success); border-color: var(--success); color: #fff; font-size: 12px; }
-.step-item.step-current .step-dot { border-color: var(--accent-mid); background: var(--accent-light); box-shadow: 0 0 0 3px rgba(45,122,94,0.12); }
+.step-item.step-current .step-dot { border-color: var(--gold); background: var(--gold-light); box-shadow: 0 0 0 3px rgba(196,147,63,0.13); }
 .step-label { font-size: 9px; color: var(--text-3); margin-top: 4px; text-align: center; line-height: 1.3; white-space: nowrap; }
 .step-item.step-done .step-label    { color: var(--success); }
-.step-item.step-current .step-label { color: var(--accent); font-weight: 600; }
+.step-item.step-current .step-label { color: var(--gold); font-weight: 600; }
 .step-action-area {
   display: flex; gap: 8px; align-items: center;
   padding-top: 10px; flex-wrap: wrap;
@@ -504,10 +521,11 @@ body {
 /* ─── My PR tab ─── */
 .my-pr-card {
   background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--gold-border);
   border-radius: 10px; padding: 16px 18px; margin-bottom: 10px;
   transition: box-shadow 0.15s;
 }
-.my-pr-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.my-pr-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
 .my-pr-card.urg-urgent  { border-left: 3px solid #D97706; }
 .my-pr-card.urg-critical { border-left: 3px solid #DC2626; }
 .edit-form { background: var(--bg); border-radius: 8px; padding: 14px; margin-top: 12px; }
@@ -532,10 +550,80 @@ body {
   color: var(--text-3); border: 1px solid var(--border); border-radius: 7px;
   font-family: var(--sans); font-size: 13px; cursor: pointer; margin-top: 6px; }
 
+/* ─── My PR vertical Timeline ─── */
+.pr-timeline {
+  margin: 14px 0 10px;
+  padding: 0;
+}
+.tl-item {
+  display: flex;
+  gap: 10px;
+  position: relative;
+}
+.tl-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 28px;
+  flex-shrink: 0;
+}
+.tl-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  position: relative; z-index: 1;
+  transition: all 0.15s;
+}
+.tl-connector {
+  width: 2px;
+  flex: 1;
+  min-height: 14px;
+  background: var(--border);
+  margin: 3px 0;
+}
+.tl-item.tl-done .tl-dot {
+  background: var(--success); border-color: var(--success); color: #fff; font-size: 11px;
+}
+.tl-item.tl-done .tl-connector { background: #86EFAC; }
+.tl-item.tl-current .tl-dot {
+  border-color: var(--gold); background: var(--gold-light);
+  box-shadow: 0 0 0 3px rgba(196,147,63,0.15);
+}
+.tl-item.tl-rejected .tl-dot {
+  background: var(--danger); border-color: var(--danger); color: #fff; font-size: 11px;
+}
+.tl-body {
+  flex: 1;
+  padding: 3px 0 14px;
+}
+.tl-item:last-child .tl-body { padding-bottom: 0; }
+.tl-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+.tl-item.tl-done    .tl-title { color: var(--success); }
+.tl-item.tl-current .tl-title { color: #9B7330; font-weight: 600; }
+.tl-item.tl-rejected .tl-title { color: var(--danger); font-weight: 600; }
+.tl-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.tl-item.tl-done    .tl-sub { color: #4B9E6E; }
+.tl-item.tl-current .tl-sub { color: #A37428; }
+.tl-item.tl-rejected .tl-sub { color: var(--danger); }
+
 /* ─── User pill (LIFF profile) ─── */
 .user-pill {
   display: flex; align-items: center; gap: 10px;
-  background: var(--accent-light); border: 1px solid var(--border);
+  background: var(--gold-light); border: 1px solid var(--gold-border);
   border-radius: 40px; padding: 5px 14px 5px 5px;
   margin-bottom: 4px;
 }
@@ -625,8 +713,91 @@ body {
 }
 .admin-item-img:hover { transform: scale(1.08); opacity: 0.88; }
 
+/* ─── Mobile item cards + bottom sheet (B1) ─── */
+#mobile-items { display: none; }
+.m-add-btn { display: none; }
+.m-item-card {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+}
+.m-item-thumb {
+  width: 44px; height: 44px; border-radius: 8px; object-fit: cover;
+  border: 1px solid var(--border); flex-shrink: 0;
+}
+.m-item-thumb-ph {
+  width: 44px; height: 44px; border-radius: 8px; flex-shrink: 0;
+  background: var(--accent-light); display: flex; align-items: center;
+  justify-content: center; font-size: 18px;
+}
+.m-item-info { flex: 1; min-width: 0; }
+.m-item-name { font-size: 14px; font-weight: 500; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-item-meta { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+.m-item-sub  { font-family: var(--mono); font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.m-item-actions { display: flex; gap: 2px; flex-shrink: 0; }
+.m-item-actions button {
+  background: none; border: none; cursor: pointer; font-size: 15px;
+  padding: 6px; border-radius: 6px; color: var(--text-3);
+}
+.m-item-actions button:active { background: var(--border); }
+.m-empty-items {
+  text-align: center; padding: 20px; color: var(--text-3);
+  font-size: 13px; background: var(--bg); border: 1px dashed var(--border);
+  border-radius: 10px; margin-bottom: 8px;
+}
+
+/* bottom sheet */
+.sheet-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4); z-index: 100;
+}
+.sheet-overlay.open { display: block; }
+.item-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 101;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
+  max-height: 88vh; overflow-y: auto;
+  transform: translateY(100%); transition: transform 0.22s ease;
+  box-shadow: 0 -6px 30px rgba(0,0,0,0.18);
+}
+.item-sheet.open { transform: translateY(0); }
+.sheet-handle {
+  width: 40px; height: 4px; background: var(--border-strong);
+  border-radius: 2px; margin: 0 auto 14px;
+}
+.sheet-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+.sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sheet-grid .span2 { grid-column: 1 / -1; }
+.sheet-save-btn {
+  width: 100%; padding: 13px; background: var(--accent); color: #fff;
+  border: none; border-radius: 9px; font-family: var(--sans);
+  font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 16px;
+}
+.sheet-cancel-btn {
+  width: 100%; padding: 10px; background: none; color: var(--text-3);
+  border: none; font-family: var(--sans); font-size: 13px;
+  cursor: pointer; margin-top: 4px;
+}
+@media (min-width: 601px) {
+  .item-sheet { max-width: 480px; left: 50%; transform: translate(-50%, 100%); border-radius: 16px 16px 0 0; }
+  .item-sheet.open { transform: translate(-50%, 0); }
+}
+
 @media (max-width: 600px) {
   .form-grid { grid-template-columns: 1fr; }
+  /* B1: มือถือใช้ card แทนตาราง */
+  .items-table { display: none; }
+  .add-row { display: none; }
+  #mobile-items { display: block; }
+  .m-add-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 12px; border: 1px dashed var(--accent-mid);
+    border-radius: 10px; background: var(--accent-light);
+    font-family: var(--sans); font-size: 14px; font-weight: 500;
+    color: var(--accent); cursor: pointer;
+  }
   .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .tab { font-size: 12px; padding: 5px 10px; }
   .item-extra.open { grid-template-columns: 1fr; }
@@ -704,8 +875,8 @@ body {
             <div id="browser-login" style="display:none;flex-direction:column;gap:10px">
               <div style="background:var(--accent-light);border:1px solid var(--border);
                 border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text-2);line-height:1.6">
-                🌐 เปิดจาก browser — กรุณา Login ด้วย LINE เพื่อดึงชื่ออัตโนมัติ<br>
-                <span style="font-size:12px;color:var(--text-3)">หรือกรอกชื่อด้านล่างถ้าไม่ต้องการ Login</span>
+                🌐 เปิดจาก browser — กรุณา Login ด้วย LINE เพื่อยืนยันตัวตนก่อนใช้งาน<br>
+                <span style="font-size:12px;color:var(--text-3)">ระบบใช้ LINE account ในการติดตามใบ PR และแจ้งเตือน</span>
               </div>
               <button onclick="loginWithLine()"
                 style="display:flex;align-items:center;justify-content:center;gap:10px;
@@ -717,22 +888,21 @@ body {
                 </svg>
                 Login ด้วย LINE
               </button>
-              <div style="display:flex;align-items:center;gap:10px;margin:4px 0">
-                <div style="flex:1;height:1px;background:var(--border)"></div>
-                <span style="font-size:12px;color:var(--text-3)">หรือ</span>
-                <div style="flex:1;height:1px;background:var(--border)"></div>
-              </div>
-              <div class="field">
-                <label>กรอกชื่อแทน</label>
-                <input id="f-name" type="text" placeholder="ชื่อ-นามสกุล"
-                  autocomplete="off" oninput="lineProfile.displayName=this.value.trim();lineProfile.userId='manual-'+Date.now()">
-              </div>
             </div>
 
-            <!-- fallback: dev mode -->
+            <!-- LIFF โหลดไม่สำเร็จ -->
             <div id="liff-fallback" style="display:none">
-              <input id="f-name-fallback" type="text" placeholder="ชื่อ-นามสกุล"
-                autocomplete="off" oninput="lineProfile.displayName=this.value.trim();lineProfile.userId='dev'">
+              <div style="background:var(--danger-bg);border:1px solid #FCA5A5;
+                border-radius:8px;padding:12px 14px;font-size:13px;color:var(--danger);line-height:1.6">
+                ⚠️ เชื่อมต่อ LINE ไม่สำเร็จ — กรุณาเปิดลิงก์นี้จากแอป LINE
+                หรือกดปุ่มด้านล่างเพื่อลองใหม่
+              </div>
+              <button onclick="location.reload()"
+                style="width:100%;margin-top:10px;padding:10px;background:var(--surface);
+                border:1px solid var(--border);border-radius:8px;font-family:var(--sans);
+                font-size:14px;color:var(--text-2);cursor:pointer">
+                🔄 ลองเชื่อมต่อใหม่
+              </button>
             </div>
           </div>
 
@@ -782,6 +952,9 @@ body {
                 </thead>
                 <tbody id="items-body"></tbody>
               </table>
+              <!-- B1: มือถือแสดงเป็น card -->
+              <div id="mobile-items"></div>
+              <button class="m-add-btn" type="button" onclick="openItemSheet()">＋ เพิ่มรายการสินค้า</button>
               <button class="add-row" type="button" onclick="addRow()">+ เพิ่มรายการ</button>
               <div class="total-bar">
                 <span>มูลค่ารวมทั้งหมด</span>
@@ -904,6 +1077,53 @@ body {
 
 </div>
 
+<!-- ─── B1: Bottom sheet เพิ่ม/แก้ไขรายการสินค้า ─── -->
+<div class="sheet-overlay" id="sheet-overlay" onclick="closeItemSheet()"></div>
+<div class="item-sheet" id="item-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title" id="sheet-title">เพิ่มรายการสินค้า</div>
+  <div class="sheet-grid">
+    <div class="field span2">
+      <label>ชื่อสินค้า <span class="req">*</span></label>
+      <input type="text" id="sh-name" placeholder="เช่น น้ำยาล้างจาน 3.8 ลิตร" autocomplete="off" list="item-names">
+    </div>
+    <div class="field">
+      <label>จำนวน <span class="req">*</span></label>
+      <input type="number" id="sh-qty" placeholder="0" min="0" inputmode="decimal">
+    </div>
+    <div class="field">
+      <label>หน่วย</label>
+      <input type="text" id="sh-unit" placeholder="ชิ้น / กล่อง / แกลลอน">
+    </div>
+    <div class="field span2">
+      <label>ราคา/หน่วย (฿)</label>
+      <input type="number" id="sh-price" placeholder="0" min="0" step="0.01" inputmode="decimal">
+    </div>
+    <div class="field span2">
+      <label>รูปสินค้า (ถ่ายจากกล้องได้)</label>
+      <label class="img-upload-label">
+        <span>📷 ถ่ายรูป / เลือกรูปภาพ</span>
+        <input type="file" accept="image/*" id="sh-img-input" onchange="sheetHandleImg(this)">
+      </label>
+      <img class="img-preview" id="sh-img-prev" alt="รูปสินค้า">
+      <button class="img-clear" id="sh-img-clear" onclick="sheetClearImg()" type="button">✕ ลบรูป</button>
+    </div>
+    <div class="field span2">
+      <label>คำอธิบาย / สเปค</label>
+      <textarea id="sh-desc" rows="2" placeholder="สี, ขนาด, สเปค หรือรายละเอียดเพิ่มเติม..."></textarea>
+    </div>
+    <div class="field span2">
+      <label>ลิงก์สั่งซื้อ / อ้างอิง</label>
+      <input type="text" id="sh-link" placeholder="https://...">
+    </div>
+  </div>
+  <button class="sheet-save-btn" onclick="sheetSave()">บันทึกรายการ</button>
+  <button class="sheet-cancel-btn" onclick="closeItemSheet()">ยกเลิก</button>
+</div>
+
+<!-- B2: autocomplete ชื่อสินค้าจากประวัติ -->
+<datalist id="item-names"></datalist>
+
 <script>
 // ═══════════════════════════════════════════════
 //  CONFIG
@@ -963,10 +1183,10 @@ async function initLiff() {
 
   } catch (e) {
     console.log("LIFF error:", e.message);
-    // fallback สำหรับ dev / network error
+    // LIFF ล้มเหลว — ไม่มี fallback กรอกชื่อ ต้องใช้ LINE identity เท่านั้น
     document.getElementById("liff-loading").style.display = "none";
     document.getElementById("liff-fallback").style.display = "block";
-    lineProfile = { userId: "dev", displayName: "", pictureUrl: "" };
+    lineProfile = { userId: "", displayName: "", pictureUrl: "" };
   }
 }
 
@@ -986,6 +1206,9 @@ function showUserPill(displayName, pictureUrl) {
   document.getElementById("liff-fallback").style.display  = "none";
   document.getElementById("browser-login").style.display  = "none";
   pill.style.display = "flex";
+
+  // โหลดประวัติ PR เงียบๆ เพื่อให้ autocomplete ชื่อสินค้าพร้อมใช้ทันที
+  loadMyPRs().catch(() => {});
 }
 
 function showBrowserLoginPrompt() {
@@ -1037,6 +1260,7 @@ async function loadMyPRs() {
     if (result.success) {
       myPRs = result.data || [];
       renderMyPRs();
+      updateItemNameSuggestions();
     } else {
       document.getElementById("myprs-list").innerHTML =
         '<div class="empty"><span class="empty-icon">⚠️</span>' + (result.error||"โหลดไม่ได้") + "</div>";
@@ -1047,6 +1271,71 @@ async function loadMyPRs() {
   } finally {
     document.getElementById("myprs-loading").classList.remove("show");
   }
+}
+
+// ── Build vertical timeline HTML for My PRs tab ──
+function buildPRTimeline(pr, status) {
+  const TLINE = [
+    { th:'ส่ง PR แล้ว',   icon:'📋' },
+    { th:'รับทราบแล้ว',   icon:'👀', match:'รับทราบ' },
+    { th:'สั่งซื้อแล้ว',  icon:'🛒', match:'สั่งแล้ว' },
+    { th:'รอรับของ',       icon:'⏳', match:'รอของ' },
+    { th:'เสร็จสิ้น',      icon:'✅', match:'สำเร็จ' },
+  ];
+  const isRejected = status.includes('ปฏิเสธ');
+  const updatedBy  = pr['ดำเนินการโดย'] || '';
+  const eta        = pr['วันที่คาดว่าของจะถึง'] || '';
+
+  let curStep = 0;
+  if (!isRejected) {
+    for (let i = TLINE.length - 1; i >= 1; i--) {
+      if (status.includes(TLINE[i].match)) { curStep = i; break; }
+    }
+  }
+
+  // Sub-text per step
+  const stepSub = [
+    pr['วันที่ส่ง'] || '',
+    (curStep === 1 && updatedBy) ? 'โดย ' + updatedBy : '',
+    (curStep === 2 && updatedBy) ? 'โดย ' + updatedBy : '',
+    eta
+      ? '📦 คาดว่าถึง ' + eta + (curStep === 3 && updatedBy ? ' · โดย ' + updatedBy : '')
+      : (curStep === 3 && updatedBy ? 'โดย ' + updatedBy : ''),
+    (curStep === 4) ? (pr['ยืนยันรับของโดย'] ? 'ยืนยันโดย ' + pr['ยืนยันรับของโดย'] : (updatedBy ? 'โดย ' + updatedBy : '')) : '',
+  ];
+
+  let html = '<div class="pr-timeline">';
+  TLINE.forEach(function(step, idx) {
+    const isLast    = (idx === TLINE.length - 1) && !isRejected;
+    const isDone    = idx < curStep;
+    const isCurrent = !isRejected && idx === curStep;
+    const cls  = isDone ? 'tl-done' : isCurrent ? 'tl-current' : '';
+    const dot  = isDone ? '✓' : step.icon;
+    const sub  = stepSub[idx];
+    html += '<div class="tl-item ' + cls + '">';
+    html += '<div class="tl-left">';
+    html += '<div class="tl-dot">' + dot + '</div>';
+    if (!isLast) html += '<div class="tl-connector"></div>';
+    html += '</div>';
+    html += '<div class="tl-body">';
+    html += '<div class="tl-title">' + step.th + '</div>';
+    if (sub) html += '<div class="tl-sub">' + sub + '</div>';
+    html += '</div></div>';
+  });
+
+  if (isRejected) {
+    html += '<div class="tl-item tl-rejected">';
+    html += '<div class="tl-left"><div class="tl-dot">✕</div></div>';
+    html += '<div class="tl-body">';
+    html += '<div class="tl-title">ปฏิเสธคำขอ</div>';
+    const rejReason = pr['comment'] || '';
+    if (rejReason)  html += '<div class="tl-sub">เหตุผล: ' + rejReason + '</div>';
+    if (updatedBy)  html += '<div class="tl-sub">โดย ' + updatedBy + '</div>';
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 function renderMyPRs() {
@@ -1067,7 +1356,13 @@ function renderMyPRs() {
     const isPending= status.includes("รอดำเนินการ");
     const urgRaw   = pr["ความเร่งด่วน"] || "";
     const urgClass = urgRaw.includes("เร่งด่วน") ? "urg-urgent" : urgRaw.includes("วิกฤต") ? "urg-critical" : "";
-    const badgeCls = isPending ? "badge-pending" : status.includes("อนุมัติ") ? "badge-approved" : "badge-rejected";
+    const badgeCls = isPending ? "badge-pending"
+      : status.includes("สำเร็จ")  ? "badge-approved"
+      : status.includes("ปฏิเสธ") ? "badge-rejected"
+      : status.includes("สั่งแล้ว") ? "badge-ordered"
+      : status.includes("รอของ")   ? "badge-waiting"
+      : status.includes("รับทราบ") ? "badge-acknowledged"
+      : "badge-pending";
     const total    = parseFloat(pr["มูลค่ารวม (฿)"]) || 0;
     const isEdit   = myEditMode[prId];
     const comment  = pr["comment"] || "";
@@ -1105,7 +1400,6 @@ function renderMyPRs() {
         </div>
         <span class="badge ${badgeCls}">${status}</span>
       </div>
-      ${pr["วันที่คาดว่าของจะถึง"] ? `<div style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;padding:5px 10px;background:#E3F2FD;border-radius:6px;font-size:12px;font-weight:500;color:#0077B6">📦 คาดว่าของจะถึง: ${pr["วันที่คาดว่าของจะถึง"]}</div>` : ""}
       ${comment ? `<div class="pr-comment">💬 ${comment}</div>` : ""}
 
       ${isEdit ? `
@@ -1165,7 +1459,9 @@ function renderMyPRs() {
       </div>
       ` : `
       <!-- ─── View Mode ─── -->
-      <div style="font-size:13px;color:var(--text-2);margin-top:8px">
+      ${buildPRTimeline(pr, status)}
+      <!-- ─── Items ─── -->
+      <div style="font-size:13px;color:var(--text-2);border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
         ${items.map(it => {
           const sub = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
           return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
@@ -1175,10 +1471,27 @@ function renderMyPRs() {
         }).join("")}
         <div style="text-align:right;font-family:var(--mono);font-weight:500;margin-top:8px">฿${total.toLocaleString("th-TH")}</div>
       </div>
-      ${isPending ? `<button onclick="openMyEdit('${prId}')"
-        style="margin-top:12px;width:100%;padding:9px;border:1px solid var(--border);
-        border-radius:7px;background:none;font-family:var(--sans);font-size:14px;
-        cursor:pointer;color:var(--text-2)">✏️ แก้ไขข้อมูล PR นี้</button>` : ""}
+      ${status.includes("รอของ") ? `
+      <button id="confirm-btn-${prId}" onclick="confirmReceipt('${prId}')"
+        style="width:100%;margin-top:10px;padding:11px;background:var(--success);
+        color:#fff;border:none;border-radius:8px;font-family:var(--sans);
+        font-size:14px;font-weight:600;cursor:pointer">
+        ✅ ยืนยันรับของแล้ว
+      </button>` : ""}
+      <div style="display:flex;gap:8px;margin-top:10px">
+        ${isPending ? `<button onclick="openMyEdit('${prId}')"
+          style="flex:1;padding:9px;border:1px solid var(--border);
+          border-radius:7px;background:none;font-family:var(--sans);font-size:13px;
+          cursor:pointer;color:var(--text-2)">✏️ แก้ไข PR</button>` : ""}
+        <button onclick="reorderPR('${prId}')"
+          style="flex:1;padding:9px;border:1px solid var(--gold-border);
+          border-radius:7px;background:var(--gold-light);font-family:var(--sans);font-size:13px;
+          cursor:pointer;color:#9B7330;font-weight:500;white-space:nowrap">🔁 สั่งซ้ำ</button>
+        <button onclick="printMyPR('${prId}')"
+          style="padding:9px 14px;border:1px solid var(--border);
+          border-radius:7px;background:none;font-family:var(--sans);font-size:13px;
+          cursor:pointer;color:var(--text-2);white-space:nowrap">📄 PDF</button>
+      </div>
       `}
     </div>`;
   }).join("");
@@ -1285,6 +1598,79 @@ async function saveMyEdit(prId) {
   }
 }
 
+// ── B2: autocomplete ชื่อสินค้าจากประวัติ ────────────────────
+function updateItemNameSuggestions() {
+  const dl = document.getElementById("item-names");
+  if (!dl) return;
+  const names = new Set();
+  myPRs.forEach(pr => {
+    try {
+      const items = JSON.parse(pr["รายการ JSON"] || "[]");
+      if (Array.isArray(items))
+        items.forEach(i => { if (i.name && i.name.trim()) names.add(i.name.trim()); });
+    } catch(e) {}
+  });
+  dl.innerHTML = [...names].sort()
+    .map(n => `<option value="${escAttr(n)}">`).join("");
+}
+
+// ── B2: สั่งซ้ำจาก PR เดิม ───────────────────────────────────
+function reorderPR(prId) {
+  const pr = myPRs.find(r => r["PR ID"] === prId);
+  if (!pr) return;
+  let items = [];
+  try {
+    const parsed = JSON.parse(pr["รายการ JSON"] || "");
+    if (Array.isArray(parsed)) items = parsed;
+  } catch(e) {}
+  if (!items.length) { alert("PR นี้ไม่มีข้อมูลรายการที่นำมาสั่งซ้ำได้"); return; }
+
+  // คัดลอกรายการ (ไม่เอารูปของใบเก่า)
+  setFormItems(items.map(i => ({
+    name: i.name || "", qty: i.qty || "", unit: i.unit || "",
+    price: i.price || "", desc: i.desc || "", link: i.link || "", img: "",
+  })));
+  const deptSel = document.getElementById("f-dept");
+  if (deptSel && pr["แผนก"]) deptSel.value = pr["แผนก"];
+
+  // สลับไปแท็บส่งคำขอ
+  switchTab("staff", document.querySelector(".tab"));
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  alert("🔁 คัดลอกรายการจาก " + prId + " แล้ว\nกรุณาเลือกวันที่ต้องการ ตรวจสอบรายการ แล้วกดส่ง");
+}
+
+// ── confirm receipt (B7) ─────────────────────────────────────
+async function confirmReceipt(prId) {
+  if (!confirm("ยืนยันว่าได้รับของครบถ้วนแล้ว?\nสถานะจะเปลี่ยนเป็น \"สำเร็จ\"")) return;
+
+  const btn = document.getElementById("confirm-btn-" + prId);
+  if (btn) { btn.disabled = true; btn.textContent = "กำลังยืนยัน..."; }
+
+  try {
+    const res = await fetch(CONFIG.WEBHOOK_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        action:      "confirmReceipt",
+        prId,
+        lineUserId:  lineProfile.userId,
+        displayName: lineProfile.displayName,
+      }),
+      headers: { "Content-Type": "text/plain" },
+    });
+    const result = await res.json();
+    if (result.success) {
+      await loadMyPRs();
+      alert("✅ ยืนยันรับของเรียบร้อย — PR สำเร็จแล้ว");
+    } else {
+      alert("❌ " + (result.error || "ยืนยันไม่สำเร็จ"));
+      if (btn) { btn.disabled = false; btn.textContent = "✅ ยืนยันรับของแล้ว"; }
+    }
+  } catch (err) {
+    alert("เชื่อมต่อไม่ได้: " + err.message);
+    if (btn) { btn.disabled = false; btn.textContent = "✅ ยืนยันรับของแล้ว"; }
+  }
+}
+
 // ── tabs ─────────────────────────────────────────────────────
 function switchTab(tab, btn) {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
@@ -1294,19 +1680,39 @@ function switchTab(tab, btn) {
   if (tab === "myprs" && lineProfile.userId) loadMyPRs();
 }
 
-// ── items table ──────────────────────────────────────────────
+// ── items: formItems array เป็น source of truth เดียว ────────
+//    (desktop table + mobile cards ใช้ข้อมูลชุดเดียวกัน)
+let formItems = [];
+
+function escAttr(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+}
+
+function newItem() {
+  return { _id: ++rowCount, name:"", qty:"", unit:"", price:"", desc:"", link:"", img:"" };
+}
+
+function findItem(id) { return formItems.find(i => i._id === id); }
+
 function addRow() {
-  const id = ++rowCount;
+  const it = newItem();
+  formItems.push(it);
+  appendDesktopRow(it);
+  renderMobileItems();
+}
+
+function appendDesktopRow(it) {
+  const id = it._id;
   const tbody = document.getElementById("items-body");
 
   // main row
   const tr = document.createElement("tr");
   tr.id = "row-" + id;
   tr.innerHTML = `
-    <td><input type="text" placeholder="ชื่อสินค้า" data-f="name" oninput="calcTotal()"></td>
-    <td><input type="number" placeholder="0" min="1" data-f="qty" style="width:56px" oninput="calcRowTotal(${id});calcTotal()"></td>
-    <td><input type="text" placeholder="ชิ้น/กล่อง" data-f="unit" oninput="calcTotal()"></td>
-    <td><input type="number" placeholder="0" min="0" data-f="price" style="width:76px" oninput="calcRowTotal(${id});calcTotal()"></td>
+    <td><input type="text" placeholder="ชื่อสินค้า" data-f="name" list="item-names" value="${escAttr(it.name)}" oninput="updItem(${id},'name',this.value)"></td>
+    <td><input type="number" placeholder="0" min="1" data-f="qty" style="width:56px" value="${escAttr(it.qty)}" oninput="updItem(${id},'qty',this.value)"></td>
+    <td><input type="text" placeholder="ชิ้น/กล่อง" data-f="unit" value="${escAttr(it.unit)}" oninput="updItem(${id},'unit',this.value)"></td>
+    <td><input type="number" placeholder="0" min="0" data-f="price" style="width:76px" value="${escAttr(it.price)}" oninput="updItem(${id},'price',this.value)"></td>
     <td><span id="sub-${id}" style="font-family:var(--mono);font-size:12px;color:var(--text-3)">—</span></td>
     <td style="text-align:center">
       <button class="extra-toggle" id="etbtn-${id}" onclick="toggleExtra(${id})" type="button" title="เพิ่มรูป / คำอธิบาย / ลิงก์">+ ข้อมูล</button>
@@ -1338,19 +1744,53 @@ function addRow() {
         <!-- คำอธิบายสินค้า -->
         <div>
           <div class="extra-label">คำอธิบาย / สเปค</div>
-          <textarea placeholder="สี, ขนาด, สเปค หรือรายละเอียดเพิ่มเติม..." data-f="desc" rows="3" id="desc-${id}"></textarea>
+          <textarea placeholder="สี, ขนาด, สเปค หรือรายละเอียดเพิ่มเติม..." data-f="desc" rows="3" id="desc-${id}" oninput="updItem(${id},'desc',this.value)">${escAttr(it.desc)}</textarea>
         </div>
 
         <!-- ลิงก์สั่งซื้อ -->
         <div class="item-extra-full">
           <div class="extra-label">ลิงก์สั่งซื้อ / อ้างอิง</div>
-          <input type="text" placeholder="https://www.lazada.co.th/... หรือ URL อื่นๆ" data-f="link" id="link-${id}">
+          <input type="text" placeholder="https://www.lazada.co.th/... หรือ URL อื่นๆ" data-f="link" id="link-${id}" value="${escAttr(it.link)}" oninput="updItem(${id},'link',this.value)">
         </div>
 
       </div>
     </td>
   `;
   tbody.appendChild(xtr);
+
+  // restore image preview ถ้ามีรูป
+  if (it.img) {
+    const prev = document.getElementById("img-prev-" + id);
+    const clr  = document.getElementById("img-clear-" + id);
+    prev.src = it.img; prev.classList.add("show"); clr.classList.add("show");
+  }
+  calcRowTotal(id);
+}
+
+function updItem(id, field, value) {
+  const it = findItem(id);
+  if (!it) return;
+  it[field] = value;
+  if (field === "qty" || field === "price") calcRowTotal(id);
+  calcTotal();
+  if (["name","qty","unit","price"].includes(field)) renderMobileItems();
+}
+
+function rebuildDesktopRows() {
+  document.getElementById("items-body").innerHTML = "";
+  formItems.forEach(appendDesktopRow);
+  calcTotal();
+}
+
+// ตั้งรายการทั้งชุด (ใช้ตอนสั่งซ้ำ)
+function setFormItems(items) {
+  formItems = (items || []).map(i => ({
+    _id: ++rowCount,
+    name: i.name || "", qty: i.qty || "", unit: i.unit || "",
+    price: i.price || "", desc: i.desc || "", link: i.link || "", img: i.img || "",
+  }));
+  rebuildDesktopRows();
+  renderMobileItems();
 }
 
 function toggleExtra(id) {
@@ -1361,10 +1801,8 @@ function toggleExtra(id) {
   btn.textContent = open ? "▲ ปิด" : "+ ข้อมูล";
 }
 
-function handleImg(id, input) {
-  const file = input.files[0];
-  if (!file) return;
-  // resize to max 600px & compress before storing
+// บีบอัดรูปเป็น JPEG ≤600px (ใช้ทั้ง desktop + bottom sheet)
+function compressImg(file, callback) {
   const reader = new FileReader();
   reader.onload = e => {
     const img = new Image();
@@ -1378,74 +1816,182 @@ function handleImg(id, input) {
       }
       canvas.width = w; canvas.height = h;
       canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-      const b64 = canvas.toDataURL("image/jpeg", 0.7);
-      // store on row element
-      document.getElementById("row-" + id).dataset.img = b64;
-      const prev = document.getElementById("img-prev-" + id);
-      const clr  = document.getElementById("img-clear-" + id);
-      prev.src = b64;
-      prev.classList.add("show");
-      clr.classList.add("show");
+      callback(canvas.toDataURL("image/jpeg", 0.7));
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
+function handleImg(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  compressImg(file, b64 => {
+    const it = findItem(id);
+    if (it) it.img = b64;
+    const prev = document.getElementById("img-prev-" + id);
+    const clr  = document.getElementById("img-clear-" + id);
+    prev.src = b64;
+    prev.classList.add("show");
+    clr.classList.add("show");
+    renderMobileItems();
+  });
+}
+
 function clearImg(id) {
-  document.getElementById("row-" + id).dataset.img = "";
+  const it = findItem(id);
+  if (it) it.img = "";
   const prev = document.getElementById("img-prev-" + id);
   const clr  = document.getElementById("img-clear-" + id);
   prev.src = ""; prev.classList.remove("show");
   clr.classList.remove("show");
-  // reset file input
   const wrap = document.getElementById("extra-" + id);
   const inp  = wrap.querySelector("input[type='file']");
   if (inp) inp.value = "";
+  renderMobileItems();
 }
 
 function delRow(id) {
+  formItems = formItems.filter(i => i._id !== id);
   document.getElementById("row-" + id)?.remove();
   document.getElementById("extra-row-" + id)?.remove();
   calcTotal();
+  renderMobileItems();
 }
 
 function calcRowTotal(id) {
-  const row = document.getElementById("row-" + id);
-  if (!row) return;
-  const qty = parseFloat(row.querySelector("[data-f='qty']").value) || 0;
-  const price = parseFloat(row.querySelector("[data-f='price']").value) || 0;
-  const sub = qty * price;
-  document.getElementById("sub-" + id).textContent = sub > 0
+  const it = findItem(id);
+  if (!it) return;
+  const sub = (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
+  const el = document.getElementById("sub-" + id);
+  if (el) el.textContent = sub > 0
     ? "฿" + sub.toLocaleString("th-TH", {minimumFractionDigits: 0})
     : "—";
 }
 
 function calcTotal() {
-  let total = 0;
-  document.querySelectorAll("#items-body tr").forEach(r => {
-    const qty = parseFloat(r.querySelector("[data-f='qty']")?.value) || 0;
-    const price = parseFloat(r.querySelector("[data-f='price']")?.value) || 0;
-    total += qty * price;
-  });
+  const total = formItems.reduce((s,i) =>
+    s + (parseFloat(i.qty)||0) * (parseFloat(i.price)||0), 0);
   document.getElementById("grand-total").textContent =
     "฿" + total.toLocaleString("th-TH", {minimumFractionDigits: 0});
 }
 
 function getItems() {
-  const items = [];
-  document.querySelectorAll("#items-body tr[id^='row-']").forEach(r => {
-    const id    = r.id.replace("row-", "");
-    const name  = r.querySelector("[data-f='name']")?.value.trim();
-    const qty   = r.querySelector("[data-f='qty']")?.value;
-    const unit  = r.querySelector("[data-f='unit']")?.value.trim();
-    const price = r.querySelector("[data-f='price']")?.value;
-    const desc  = document.getElementById("desc-" + id)?.value.trim() || "";
-    const link  = document.getElementById("link-" + id)?.value.trim() || "";
-    const img   = r.dataset.img || "";
-    if (name) items.push({ name, qty: qty || "1", unit: unit || "-", price: price || "0", desc, link, img });
-  });
-  return items;
+  return formItems
+    .filter(i => i.name && i.name.trim())
+    .map(i => ({
+      name:  i.name.trim(),
+      qty:   i.qty   || "1",
+      unit:  (i.unit  || "-").trim() || "-",
+      price: i.price || "0",
+      desc:  (i.desc || "").trim(),
+      link:  (i.link || "").trim(),
+      img:   i.img   || "",
+    }));
+}
+
+// ── B1: mobile item cards + bottom sheet ─────────────────────
+let sheetEditId = null;
+let sheetImg    = "";
+
+function renderMobileItems() {
+  const box = document.getElementById("mobile-items");
+  if (!box) return;
+  const real = formItems.filter(i => i.name && i.name.trim());
+  if (!real.length) {
+    box.innerHTML = '<div class="m-empty-items">ยังไม่มีรายการสินค้า — กดปุ่มด้านล่างเพื่อเพิ่ม</div>';
+    return;
+  }
+  box.innerHTML = real.map(it => {
+    const sub = (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
+    const thumb = it.img
+      ? `<img class="m-item-thumb" src="${it.img}" alt="">`
+      : `<div class="m-item-thumb-ph">📦</div>`;
+    return `<div class="m-item-card">
+      ${thumb}
+      <div class="m-item-info">
+        <div class="m-item-name">${escAttr(it.name)}</div>
+        <div class="m-item-meta">${escAttr(it.qty || "1")} ${escAttr(it.unit || "")}${it.desc ? " · " + escAttr(it.desc) : ""}</div>
+      </div>
+      <span class="m-item-sub">${sub > 0 ? "฿" + sub.toLocaleString("th-TH") : ""}</span>
+      <div class="m-item-actions">
+        <button type="button" onclick="openItemSheet(${it._id})" title="แก้ไข">✏️</button>
+        <button type="button" onclick="delRow(${it._id})" title="ลบ">✕</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function openItemSheet(id) {
+  sheetEditId = id || null;
+  const it = id ? findItem(id) : null;
+  document.getElementById("sheet-title").textContent = it ? "แก้ไขรายการสินค้า" : "เพิ่มรายการสินค้า";
+  document.getElementById("sh-name").value  = it ? it.name  : "";
+  document.getElementById("sh-qty").value   = it ? it.qty   : "";
+  document.getElementById("sh-unit").value  = it ? it.unit  : "";
+  document.getElementById("sh-price").value = it ? it.price : "";
+  document.getElementById("sh-desc").value  = it ? it.desc  : "";
+  document.getElementById("sh-link").value  = it ? it.link  : "";
+  document.getElementById("sh-img-input").value = "";
+  sheetImg = it ? (it.img || "") : "";
+  updateSheetImgPreview();
+  document.getElementById("sheet-overlay").classList.add("open");
+  document.getElementById("item-sheet").classList.add("open");
+  setTimeout(() => document.getElementById("sh-name").focus(), 250);
+}
+
+function closeItemSheet() {
+  document.getElementById("sheet-overlay").classList.remove("open");
+  document.getElementById("item-sheet").classList.remove("open");
+  sheetEditId = null;
+  sheetImg = "";
+}
+
+function sheetHandleImg(input) {
+  const file = input.files[0];
+  if (!file) return;
+  compressImg(file, b64 => { sheetImg = b64; updateSheetImgPreview(); });
+}
+
+function sheetClearImg() {
+  sheetImg = "";
+  document.getElementById("sh-img-input").value = "";
+  updateSheetImgPreview();
+}
+
+function updateSheetImgPreview() {
+  const prev = document.getElementById("sh-img-prev");
+  const clr  = document.getElementById("sh-img-clear");
+  if (sheetImg) {
+    prev.src = sheetImg; prev.classList.add("show"); clr.classList.add("show");
+  } else {
+    prev.src = ""; prev.classList.remove("show"); clr.classList.remove("show");
+  }
+}
+
+function sheetSave() {
+  const name = document.getElementById("sh-name").value.trim();
+  if (!name) { alert("กรุณาใส่ชื่อสินค้า"); return; }
+  const vals = {
+    name,
+    qty:   document.getElementById("sh-qty").value,
+    unit:  document.getElementById("sh-unit").value.trim(),
+    price: document.getElementById("sh-price").value,
+    desc:  document.getElementById("sh-desc").value.trim(),
+    link:  document.getElementById("sh-link").value.trim(),
+    img:   sheetImg,
+  };
+  if (sheetEditId) {
+    const it = findItem(sheetEditId);
+    if (it) Object.assign(it, vals);
+  } else {
+    const it = newItem();
+    Object.assign(it, vals);
+    formItems.push(it);
+  }
+  rebuildDesktopRows();
+  renderMobileItems();
+  closeItemSheet();
 }
 
 
@@ -1511,16 +2057,10 @@ async function submitPR() {
   hideToasts();
 
   try {
-    // ถ้ายังไม่มีชื่อ — เช็ค fallback input
-    if (!lineProfile.displayName) {
-      const fn = document.getElementById("f-name") || document.getElementById("f-name-fallback");
-      if (fn && fn.value.trim()) {
-        lineProfile.displayName = fn.value.trim();
-        lineProfile.userId = lineProfile.userId || "manual";
-      } else {
-        showToast("error", "กรุณา Login ด้วย LINE หรือกรอกชื่อก่อนส่ง");
-        btn.disabled = false; btnText.textContent = "ส่ง Purchase Request"; return;
-      }
+    // บังคับ LINE identity — ไม่มี fallback กรอกชื่อ
+    if (!lineProfile.userId || !lineProfile.displayName) {
+      showToast("error", "กรุณา Login ด้วย LINE ก่อนส่งคำขอ");
+      btn.disabled = false; btnText.textContent = "ส่ง Purchase Request"; return;
     }
     const payload = {
       action:      "submit",
@@ -1556,10 +2096,10 @@ async function submitPR() {
 
 function resetForm() {
   document.getElementById("f-dept").value = "";
-  document.getElementById("f-name").value = "";
   document.getElementById("f-date").value = "";
   document.getElementById("f-note").value = "";
   document.querySelector("input[name='urgency'][value='normal']").checked = true;
+  formItems = [];
   document.getElementById("items-body").innerHTML = "";
   document.getElementById("grand-total").textContent = "฿0";
   rowCount = 0;
@@ -1975,8 +2515,18 @@ ${pr["comment"] ? `<div class="comment-box"><strong>หมายเหตุ Adm
 
 // ── update status ─────────────────────────────────────────────
 async function updateStatus(prId, status) {
-  const comment           = document.getElementById("cmt-" + prId)?.value || "";
+  let comment             = document.getElementById("cmt-" + prId)?.value || "";
   const estimatedArrival  = document.getElementById("eta-" + prId)?.value || "";
+
+  // ปฏิเสธต้องมีเหตุผลเสมอ
+  if (status === "rejected" && !comment.trim()) {
+    const reason = prompt("กรุณาระบุเหตุผลการปฏิเสธ (จำเป็น):");
+    if (!reason || !reason.trim()) {
+      alert("ไม่สามารถปฏิเสธได้ — ต้องระบุเหตุผลเพื่อแจ้งผู้ขอ");
+      return;
+    }
+    comment = reason.trim();
+  }
   const payload = {
     action: "updateStatus",
     prId,
