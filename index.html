@@ -1327,7 +1327,6 @@ function buildPRTimeline(pr, status) {
     { th:'ส่ง PR แล้ว',   icon:'📋' },
     { th:'รับทราบแล้ว',   icon:'👀', match:'รับทราบ' },
     { th:'สั่งซื้อแล้ว',  icon:'🛒', match:'สั่งแล้ว' },
-    { th:'รอรับของ',       icon:'⏳', match:'รอของ' },
     { th:'เสร็จสิ้น',      icon:'✅', match:'สำเร็จ' },
   ];
   const isRejected = status.includes('ปฏิเสธ');
@@ -1336,8 +1335,8 @@ function buildPRTimeline(pr, status) {
 
   let curStep = 0;
   if (!isRejected) {
-    if (status.includes('รับบางส่วน')) {
-      curStep = 3;  // รับบางส่วน = อยู่ขั้นรอรับของ
+    if (status.includes('รับบางส่วน') || status.includes('รอของ')) {
+      curStep = 2;  // รอของ/รับบางส่วน = อยู่ขั้นสั่งซื้อแล้ว (รอรับของรายชิ้น)
     } else {
       for (let i = TLINE.length - 1; i >= 1; i--) {
         if (status.includes(TLINE[i].match)) { curStep = i; break; }
@@ -1349,16 +1348,15 @@ function buildPRTimeline(pr, status) {
   const stepSub = [
     (pr['วันที่ส่ง'] || '') + (status.includes('รออนุมัติ') ? ' · 🔵 รออนุมัติผู้จัดการ (ยอดเกินวงเงิน)' : ''),
     (curStep === 1 && updatedBy) ? 'โดย ' + updatedBy : '',
-    (curStep === 2 && updatedBy) ? 'โดย ' + updatedBy : '',
     (function(){
       const m = status.match(/รับบางส่วน\s*(\d+\/\d+)/);
       return [
         m ? '🟠 รับแล้ว ' + m[1] : '',
         eta ? '📦 คาดว่าถึง ' + eta : '',
-        (curStep === 3 && updatedBy) ? 'โดย ' + updatedBy : '',
+        (curStep === 2 && updatedBy) ? 'โดย ' + updatedBy : '',
       ].filter(Boolean).join(' · ');
     })(),
-    (curStep === 4) ? (pr['ยืนยันรับของโดย'] ? 'ยืนยันโดย ' + pr['ยืนยันรับของโดย'] : (updatedBy ? 'โดย ' + updatedBy : '')) : '',
+    (curStep === 3) ? (pr['ยืนยันรับของโดย'] ? 'ยืนยันโดย ' + pr['ยืนยันรับของโดย'] : (updatedBy ? 'โดย ' + updatedBy : '')) : '',
   ];
 
   let html = '<div class="pr-timeline">';
@@ -1551,7 +1549,7 @@ function renderMyPRs() {
             const inLot = items.filter(i => String(i.lot) === String(lot));
             const rcvd  = inLot.filter(i => i.received).length;
             return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding:5px 10px;background:var(--gold-light);border-radius:6px;font-size:12px">
-              <span style="font-weight:600;color:#9B7330">📦 งวดที่ ${lot}</span>
+              <span style="font-weight:600;color:#9B7330">📦 รอบที่ ${lot}</span>
               <span style="color:var(--text-3)">${rcvd}/${inLot.length} รับแล้ว</span>
               ${first.lotEta ? `<span style="color:#0077B6">คาดถึง ${first.lotEta}</span>` : ""}
               ${first.lotNote ? `<span style="color:var(--text-2);font-style:italic">"${first.lotNote}"</span>` : ""}
@@ -1562,7 +1560,7 @@ function renderMyPRs() {
           ).join("");
           const un = items.map((it, idx) => ({it, idx})).filter(o => !o.it.lot);
           if (un.length) {
-            html += `<div style="margin-top:8px;padding:5px 10px;background:var(--bg);border-radius:6px;font-size:12px;color:var(--text-3);font-weight:500">ยังไม่จัดงวด (${un.length})</div>`;
+            html += `<div style="margin-top:8px;padding:5px 10px;background:var(--bg);border-radius:6px;font-size:12px;color:var(--text-3);font-weight:500">ยังไม่จัดรอบ (${un.length})</div>`;
             html += un.map(o => line(o.it, o.idx)).join("");
           }
           return html;
@@ -2197,11 +2195,11 @@ function toggleEditMode(prId) {
 function updateEditItem(prId, idx, field, value) {
   if (!editedData[prId]) return;
   editedData[prId][idx][field] = value;
-  // re-render เฉพาะ select (สถานะ/งวด) — ช่องพิมพ์ห้าม re-render ระหว่างพิมพ์ ไม่งั้นหลุด focus
+  // re-render เฉพาะ select (สถานะ/รอบ) — ช่องพิมพ์ห้าม re-render ระหว่างพิมพ์ ไม่งั้นหลุด focus
   if (field === "itemStatus" || field === "lot") applyFilter();
 }
 
-// เขียน ETA/หมายเหตุ ลงทุกรายการในงวดเดียวกัน (ไม่ re-render — กันหลุด focus ตอนพิมพ์)
+// เขียน ETA/หมายเหตุ ลงทุกรายการในรอบเดียวกัน (ไม่ re-render — กันหลุด focus ตอนพิมพ์)
 function updateLotMeta(prId, lot, field, value) {
   if (!editedData[prId]) return;
   editedData[prId].forEach(it => {
@@ -2467,7 +2465,7 @@ function renderPRs(list) {
                 <th style="text-align:right;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:70px">ประเมิน</th>
                 <th style="text-align:right;padding:4px 6px;color:#9B7330;font-weight:600;font-size:11px;border-bottom:1px solid var(--border);width:70px">ราคาจริง</th>
                 <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:92px">สถานะ</th>
-                <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:56px">งวด</th>
+                <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:56px">รอบ</th>
               </tr>
             </thead>
             <tbody>
@@ -2518,20 +2516,20 @@ function renderPRs(list) {
             </tbody>
           </table>
           ${(() => {
-            // ช่อง ETA + หมายเหตุ ต่องวดที่ใช้อยู่
+            // ช่อง ETA + หมายเหตุ ต่อรอบที่ใช้อยู่
             const lots = [...new Set(editedItems.map(i => i.lot).filter(Boolean))].sort();
             if (!lots.length) return "";
             return `<div style="margin-top:10px;padding:10px;background:var(--gold-light);border:1px solid var(--gold-border);border-radius:8px">
-              <div style="font-size:11px;font-weight:600;color:#9B7330;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px">📦 ข้อมูลงวดจัดส่ง</div>
+              <div style="font-size:11px;font-weight:600;color:#9B7330;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px">📦 ข้อมูลรอบจัดส่ง</div>
               ${lots.map(lot => {
                 const first = editedItems.find(i => String(i.lot) === String(lot)) || {};
                 const count = editedItems.filter(i => String(i.lot) === String(lot)).length;
                 return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
-                  <span style="font-size:12px;font-weight:600;white-space:nowrap">งวดที่ ${lot} <span style="color:var(--text-3);font-weight:400">(${count} รายการ)</span></span>
+                  <span style="font-size:12px;font-weight:600;white-space:nowrap">รอบที่ ${lot} <span style="color:var(--text-3);font-weight:400">(${count} รายการ)</span></span>
                   <input type="date" value="${first.lotEta || ''}" title="วันที่คาดว่าของจะถึง"
                     style="padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-family:var(--sans);font-size:12px;background:var(--surface)"
                     onchange="updateLotMeta('${prId}','${lot}','lotEta',this.value)">
-                  <input type="text" value="${(first.lotNote || '').replace(/"/g,'&quot;')}" placeholder="หมายเหตุงวดนี้ เช่น ร้านส่งจากสมุย..."
+                  <input type="text" value="${(first.lotNote || '').replace(/"/g,'&quot;')}" placeholder="หมายเหตุรอบนี้ เช่น ร้านส่งจากสมุย..."
                     style="flex:1;min-width:150px;padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-family:var(--sans);font-size:12px;background:var(--surface)"
                     oninput="updateLotMeta('${prId}','${lot}','lotNote',this.value)">
                 </div>`;
@@ -2575,7 +2573,7 @@ function renderPRs(list) {
               const inLot = itemsData.filter(i => String(i.lot) === String(lot));
               const rcvd  = inLot.filter(i => i.received).length;
               return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;padding:6px 10px;background:var(--gold-light);border-radius:6px;font-size:12px">
-                <span style="font-weight:600;color:#9B7330">📦 งวดที่ ${lot}</span>
+                <span style="font-weight:600;color:#9B7330">📦 รอบที่ ${lot}</span>
                 <span style="color:var(--text-3)">${rcvd}/${inLot.length} รับแล้ว</span>
                 ${first.lotEta ? `<span style="color:#0077B6">คาดถึง ${first.lotEta}</span>` : ""}
                 ${first.lotNote ? `<span style="color:var(--text-2);font-style:italic">"${first.lotNote}"</span>` : ""}
@@ -2586,7 +2584,7 @@ function renderPRs(list) {
             ).join("");
             const unassigned = itemsData.filter(i => !i.lot);
             if (unassigned.length) {
-              html += `<div style="margin-top:10px;padding:6px 10px;background:var(--bg);border-radius:6px;font-size:12px;color:var(--text-3);font-weight:500">ยังไม่จัดงวด (${unassigned.length})</div>`;
+              html += `<div style="margin-top:10px;padding:6px 10px;background:var(--bg);border-radius:6px;font-size:12px;color:var(--text-3);font-weight:500">ยังไม่จัดรอบ (${unassigned.length})</div>`;
               html += unassigned.map(line).join("");
             }
             return html;
@@ -2606,8 +2604,7 @@ function renderPRs(list) {
           const STEPS = [
             { th:'รอดำเนินการ', match:'รอดำเนินการ', emoji:'🟡', nextKey:'acknowledged', nextTh:'👀 รับทราบ' },
             { th:'รับทราบ',    match:'รับทราบ',     emoji:'👀', nextKey:'ordered',      nextTh:'🛒 สั่งแล้ว' },
-            { th:'สั่งแล้ว',  match:'สั่งแล้ว',    emoji:'🛒', nextKey:'waiting',      nextTh:'⏳ รอของ' },
-            { th:'รอของ',      match:'รอของ',        emoji:'⏳', nextKey:'done',         nextTh:'✅ สำเร็จ' },
+            { th:'สั่งแล้ว',  match:'สั่งแล้ว',    emoji:'🛒', nextKey:'done',         nextTh:'✅ สำเร็จ' },
             { th:'สำเร็จ',     match:'สำเร็จ',      emoji:'✅', nextKey:null,           nextTh:'' },
           ];
           const isRej      = status.includes('ปฏิเสธ');
@@ -2633,7 +2630,7 @@ function renderPRs(list) {
           }
 
           const ci     = isRej ? -1
-            : status.includes('รับบางส่วน') ? 3   // รับบางส่วน = ขั้นรอของ
+            : (status.includes('รับบางส่วน') || status.includes('รอของ')) ? 2   // รอของ/รับบางส่วน = ขั้นสั่งแล้ว
             : STEPS.findIndex(s => status.includes(s.match));
           const safeI  = ci < 0 ? 0 : ci;
 
