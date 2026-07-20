@@ -317,6 +317,16 @@ body {
   color: var(--text); outline: none; cursor: pointer;
 }
 .filter-bar select:focus { border-color: var(--accent-mid); }
+.search-box {
+  font-family: var(--sans); font-size: 13px;
+  padding: 7px 12px; border: 1px solid var(--border);
+  border-radius: 7px; background: var(--surface);
+  color: var(--text); outline: none;
+  flex: 1; min-width: 160px;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.search-box:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(196,147,63,0.12); }
+.search-box::placeholder { color: var(--text-3); }
 
 .refresh-btn {
   margin-left: auto;
@@ -989,6 +999,10 @@ body {
 
   <!-- ════ MY PRs VIEW ════ -->
   <div id="view-myprs" class="view">
+    <div class="filter-bar" style="margin-bottom:12px">
+      <input type="search" id="m-search" class="search-box" placeholder="🔍 ค้นหา PR ID, สินค้า, หมายเหตุ..."
+        autocomplete="off" oninput="renderMyPRs()">
+    </div>
     <div id="myprs-loading" class="loading-bar show">กำลังโหลด PR ของคุณ...</div>
     <div id="myprs-list"></div>
   </div>
@@ -1038,6 +1052,8 @@ body {
       </div>
 
       <div class="filter-bar">
+        <input type="search" id="f-search" class="search-box" placeholder="🔍 ค้นหา PR ID, สินค้า, คนขอ..."
+          autocomplete="off" oninput="applyFilter()">
         <select id="f-fdept" onchange="applyFilter()">
           <option value="">All Departments</option>
           <option>Restaurant &amp; Bar</option>
@@ -1055,7 +1071,8 @@ body {
           <option>Event</option>
         </select>
         <select id="f-fstatus" onchange="applyFilter()">
-          <option value="">ทุกสถานะ</option>
+          <option value="">งานค้าง (ซ่อนสำเร็จ)</option>
+          <option value="all">ทั้งหมด</option>
           <option value="รออนุมัติ">🔵 รออนุมัติ</option>
           <option value="รอดำเนินการ">🟡 รอดำเนินการ</option>
           <option value="รับทราบ">👀 รับทราบแล้ว</option>
@@ -1302,7 +1319,7 @@ async function loadMyPRs() {
 const ITEM_STATUS = {
   arrived:     { th:"มาแล้ว",   icon:"✅", bg:"#DCFCE7", color:"#14532D" },
   waiting:     { th:"รอของ",    icon:"⏳", bg:"#FEF3C7", color:"#92400E" },
-  unavailable: { th:"หาไม่ได้", icon:"⛔", bg:"#FEE2E2", color:"#991B1B" },
+  unavailable: { th:"ไม่มีของ", icon:"⛔", bg:"#FEE2E2", color:"#991B1B" },
 };
 
 function itemStatusChip(st) {
@@ -1311,14 +1328,14 @@ function itemStatusChip(st) {
   return `<span style="font-size:11px;padding:1px 8px;border-radius:10px;background:${s.bg};color:${s.color};white-space:nowrap">${s.icon} ${s.th}</span>`;
 }
 
-// สรุป "มาแล้ว x/y · หาไม่ได้ n" — คืน "" ถ้ายังไม่มีการติ๊กสถานะเลย
+// สรุป "มาแล้ว x/y · ไม่มีของ n" — คืน "" ถ้ายังไม่มีการติ๊กสถานะเลย
 function itemStatusSummary(items) {
   if (!Array.isArray(items) || !items.length) return "";
   if (!items.some(i => i.itemStatus)) return "";
   const arrived = items.filter(i => i.itemStatus === "arrived").length;
   const unavail = items.filter(i => i.itemStatus === "unavailable").length;
   let txt = `มาแล้ว ${arrived}/${items.length}`;
-  if (unavail) txt += ` · หาไม่ได้ ${unavail}`;
+  if (unavail) txt += ` · ไม่มีของ ${unavail}`;
   return txt;
 }
 
@@ -1399,8 +1416,14 @@ function renderMyPRs() {
     container.innerHTML = '<div class="empty"><span class="empty-icon">📭</span>ยังไม่มี PR ของคุณ</div>';
     return;
   }
+  const q = (document.getElementById("m-search")?.value || "").trim();
+  const shown = myPRs.filter(pr => prMatchesSearch(pr, q));
+  if (!shown.length) {
+    container.innerHTML = '<div class="empty"><span class="empty-icon">🔍</span>ไม่พบ PR ที่ตรงกับ "' + q.replace(/</g,"&lt;") + '"</div>';
+    return;
+  }
   const URGENCY_MAP = { NORMAL:"ปกติ", URGENT:"⚡ เร่งด่วน", CRITICAL:"🔴 วิกฤต" };
-  const sortedPRs = [...myPRs].sort((a, b) => {
+  const sortedPRs = [...shown].sort((a, b) => {
     const ai = parseInt((a["PR ID"] || "PR-0").replace("PR-", "")) || 0;
     const bi = parseInt((b["PR ID"] || "PR-0").replace("PR-", "")) || 0;
     return bi - ai;
@@ -2341,14 +2364,31 @@ function updateStats() {
   safe("s-rejected", allPRs.filter(r => (r["สถานะ"]||"").includes("ปฏิเสธ")).length);
 }
 
+// ค้นหาจากทุกส่วนของใบ PR: ID, แผนก, คนขอ, หมายเหตุ, comment, ชื่อสินค้าใน JSON
+function prMatchesSearch(pr, q) {
+  if (!q) return true;
+  const hay = [
+    pr["PR ID"], pr["แผนก"], pr["ชื่อ Line"], pr["หมายเหตุ"],
+    pr["comment"], pr["สถานะ"], pr["ดำเนินการโดย"],
+    pr["รายการสินค้า (สรุป)"], pr["รายการ JSON"],
+  ].join(" ").toLowerCase();
+  // รองรับหลายคำ คั่นด้วยช่องว่าง — ต้องเจอครบทุกคำ
+  return q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
+}
+
 function applyFilter() {
   const fDept   = document.getElementById("f-fdept").value;
   const fStatus = document.getElementById("f-fstatus").value;
   const fUrg    = document.getElementById("f-furg").value;
+  const q       = (document.getElementById("f-search")?.value || "").trim();
 
   let filtered = allPRs.filter(r => {
+    const st = r["สถานะ"] || '';
+    if (!prMatchesSearch(r, q)) return false;
     if (fDept   && r["แผนก"]        !== fDept)   return false;
-    if (fStatus && !(r["สถานะ"]||'').includes(fStatus)) return false;
+    if (fStatus === "all") { /* แสดงทุกสถานะ */ }
+    else if (fStatus && !st.includes(fStatus)) return false;
+    else if (!fStatus && !q && st.includes("สำเร็จ")) return false;  // ซ่อนสำเร็จเฉพาะตอนไม่ได้ค้นหา
     if (fUrg    && r["ความเร่งด่วน"] !== fUrg)   return false;
     return true;
   });
@@ -2501,7 +2541,7 @@ function renderPRs(list) {
                       <option value="" ${!it.itemStatus?"selected":""}>—</option>
                       <option value="arrived" ${it.itemStatus==="arrived"?"selected":""}>✅ มาแล้ว</option>
                       <option value="waiting" ${it.itemStatus==="waiting"?"selected":""}>⏳ รอของ</option>
-                      <option value="unavailable" ${it.itemStatus==="unavailable"?"selected":""}>⛔ หาไม่ได้</option>
+                      <option value="unavailable" ${it.itemStatus==="unavailable"?"selected":""}>⛔ ไม่มีของ</option>
                     </select>
                   </td>
                   <td style="padding:5px 4px">
