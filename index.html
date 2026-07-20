@@ -1012,11 +1012,9 @@ body {
 
     <!-- Password gate -->
     <div id="pass-gate" class="pass-gate">
-      <h2>🔒 Admin Login</h2>
-      <p>ใส่รหัสผ่านเพื่อเข้าดูรายการทั้งหมด</p>
-      <input type="password" id="pass-input" placeholder="รหัสผ่าน" onkeydown="if(event.key==='Enter')checkPass()">
-      <button onclick="checkPass()">เข้าสู่ระบบ</button>
-      <div class="pass-err" id="pass-err">รหัสผ่านไม่ถูกต้อง</div>
+      <h2>🔒 เฉพาะทีมจัดซื้อ</h2>
+      <p>Login ด้วย LINE ของทีมจัดซื้อ/ผู้จัดการ ระบบจะเปิดหน้านี้ให้อัตโนมัติ<br>
+      หากคุณอยู่ในทีมแต่เข้าไม่ได้ แจ้งผู้ดูแลระบบเพื่อเพิ่มบัญชี LINE ของคุณ</p>
     </div>
 
     <!-- Admin dashboard (hidden until login) -->
@@ -1152,7 +1150,6 @@ body {
 const CONFIG = {
   LIFF_ID:         "2010069721-ujqgKNIw",
   WEBHOOK_URL:     "https://script.google.com/macros/s/AKfycbyHn2i50bAojiVhVCBs9eL17LJ0km-FB-8IuYZz7W1F_zFocWe210WCSSjvB1o3ygD8Sw/exec",
-  ADMIN_PASS:      "viewpoint2024",
   // B10: LINE userId ทีมจัดซื้อ/ผู้จัดการ — login LINE แล้วเข้า Admin ได้เลยไม่ต้องใส่รหัส
   // (ต้องตรงกับ PURCHASING_USER_IDS ในไฟล์ .gs)
   ADMIN_USER_IDS:  [
@@ -2314,20 +2311,8 @@ function hideToasts() {
   document.getElementById("toast-error").classList.remove("show");
 }
 
-// ── admin password ────────────────────────────────────────────
-function checkPass() {
-  const val = document.getElementById("pass-input").value;
-  if (val === CONFIG.ADMIN_PASS) {
-    document.getElementById("pass-gate").style.display = "none";
-    document.getElementById("admin-dash").style.display = "block";
-    const _sn = localStorage.getItem('vpAdminName') || '';
-    document.getElementById('admin-name-input').value = _sn;
-    adminName = _sn;
-    loadAdmin();
-  } else {
-    document.getElementById("pass-err").style.display = "block";
-  }
-}
+// ── admin auth: LINE userId เท่านั้น (ตัด password ออก 20/7/2026) ──
+// การปลดล็อคเกิดใน showUserPill() เมื่อ userId อยู่ใน CONFIG.ADMIN_USER_IDS
 
 // ── load admin data ───────────────────────────────────────────
 async function loadAdmin() {
@@ -2849,7 +2834,6 @@ async function updateStatus(prId, status) {
     comment,
     estimatedArrival,
     updatedBy: adminName || "Admin",
-    adminPass: CONFIG.ADMIN_PASS,
     adminUserId: lineProfile.userId || ""
   };
 
@@ -2886,7 +2870,7 @@ async function adminSaveEdit(prId) {
   try {
     const res = await fetch(CONFIG.WEBHOOK_URL, {
       method: "POST",
-      body: JSON.stringify({ action:"adminEditItems", prId, items, adminPass:CONFIG.ADMIN_PASS, adminUserId: lineProfile.userId || "", updatedBy: adminName || "Admin" }),
+      body: JSON.stringify({ action:"adminEditItems", prId, items, adminUserId: lineProfile.userId || "", updatedBy: adminName || "Admin" }),
       headers: { "Content-Type":"text/plain" },
     });
     const result = await res.json();
