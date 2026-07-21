@@ -1049,6 +1049,9 @@ body {
         </div>
       </div>
 
+      <!-- สรุปยอดรายแผนก เดือนนี้ -->
+      <div id="dept-summary"></div>
+
       <div class="filter-bar">
         <input type="search" id="f-search" class="search-box" placeholder="🔍 ค้นหา PR ID, สินค้า, คนขอ..."
           autocomplete="off" oninput="applyFilter()">
@@ -1104,7 +1107,7 @@ body {
   <div class="sheet-grid">
     <div class="field span2">
       <label>ชื่อสินค้า <span class="req">*</span></label>
-      <input type="text" id="sh-name" placeholder="เช่น น้ำยาล้างจาน 3.8 ลิตร" autocomplete="off" list="item-names">
+      <input type="text" id="sh-name" placeholder="เช่น น้ำยาล้างจาน 3.8 ลิตร" autocomplete="off" list="item-names" onchange="sheetNameChanged()">
     </div>
     <div class="field">
       <label>จำนวน <span class="req">*</span></label>
@@ -1728,20 +1731,66 @@ async function saveMyEdit(prId) {
   }
 }
 
-// ── B2: autocomplete ชื่อสินค้าจากประวัติ ────────────────────
+// ── B2: autocomplete ชื่อสินค้า + จำราคา/หน่วยล่าสุด ─────────
+let itemHistory = {};   // ชื่อสินค้า → { price, unit } จากใบล่าสุด
+
 function updateItemNameSuggestions() {
   const dl = document.getElementById("item-names");
   if (!dl) return;
   const names = new Set();
-  myPRs.forEach(pr => {
+  itemHistory = {};
+  // เรียงใหม่→เก่า เพื่อให้ราคา/หน่วยที่จำไว้เป็นของใบล่าสุด
+  const sorted = [...myPRs].sort((a, b) =>
+    (parseInt((b["PR ID"]||"PR-0").replace("PR-","")) || 0) -
+    (parseInt((a["PR ID"]||"PR-0").replace("PR-","")) || 0));
+  sorted.forEach(pr => {
     try {
       const items = JSON.parse(pr["รายการ JSON"] || "[]");
       if (Array.isArray(items))
-        items.forEach(i => { if (i.name && i.name.trim()) names.add(i.name.trim()); });
+        items.forEach(i => {
+          const nm = (i.name || "").trim();
+          if (!nm) return;
+          names.add(nm);
+          if (!itemHistory[nm]) {
+            // ราคาจริงจากจัดซื้อแม่นกว่าราคาประเมิน
+            const price = parseFloat(i.actualPrice) > 0 ? i.actualPrice : i.price;
+            itemHistory[nm] = { price: price || "", unit: i.unit || "" };
+          }
+        });
     } catch(e) {}
   });
   dl.innerHTML = [...names].sort()
     .map(n => `<option value="${escAttr(n)}">`).join("");
+}
+
+// เติมราคา+หน่วยล่าสุดเมื่อชื่อตรงกับประวัติ (เติมเฉพาะช่องที่ยังว่าง)
+function applyItemHistory(name, setUnit, setPrice) {
+  const h = itemHistory[(name || "").trim()];
+  if (!h) return false;
+  if (h.unit)  setUnit(h.unit);
+  if (h.price) setPrice(h.price);
+  return true;
+}
+
+// bottom sheet: เลือกชื่อจากประวัติ → เติมหน่วย/ราคา ถ้ายังว่าง
+function sheetNameChanged() {
+  const name  = document.getElementById("sh-name").value;
+  const unit  = document.getElementById("sh-unit");
+  const price = document.getElementById("sh-price");
+  applyItemHistory(name,
+    v => { if (!unit.value.trim())  unit.value  = v; },
+    v => { if (!price.value)        price.value = v; });
+}
+
+// ตาราง desktop: เหมือนกัน + sync ลง formItems
+function deskNameChanged(id, input) {
+  const row = document.getElementById("row-" + id);
+  if (!row) return;
+  const unitInp  = row.querySelector("[data-f='unit']");
+  const priceInp = row.querySelector("[data-f='price']");
+  applyItemHistory(input.value,
+    v => { if (!unitInp.value.trim()) { unitInp.value = v;  updItem(id, "unit", v); } },
+    v => { if (!priceInp.value)       { priceInp.value = v; updItem(id, "price", v); } });
 }
 
 // ── B2: สั่งซ้ำจาก PR เดิม ───────────────────────────────────
@@ -1892,7 +1941,7 @@ function appendDesktopRow(it) {
   const tr = document.createElement("tr");
   tr.id = "row-" + id;
   tr.innerHTML = `
-    <td><input type="text" placeholder="ชื่อสินค้า" data-f="name" list="item-names" value="${escAttr(it.name)}" oninput="updItem(${id},'name',this.value)"></td>
+    <td><input type="text" placeholder="ชื่อสินค้า" data-f="name" list="item-names" value="${escAttr(it.name)}" oninput="updItem(${id},'name',this.value)" onchange="deskNameChanged(${id}, this)"></td>
     <td><input type="number" placeholder="0" min="1" data-f="qty" style="width:56px" value="${escAttr(it.qty)}" oninput="updItem(${id},'qty',this.value)"></td>
     <td><input type="text" placeholder="ชิ้น/กล่อง" data-f="unit" value="${escAttr(it.unit)}" oninput="updItem(${id},'unit',this.value)"></td>
     <td><input type="number" placeholder="0" min="0" data-f="price" style="width:76px" value="${escAttr(it.price)}" oninput="updItem(${id},'price',this.value)"></td>
@@ -2347,6 +2396,77 @@ function updateStats() {
   safe("s-ordered",  allPRs.filter(r => (r["สถานะ"]||"").includes("สั่งแล้ว") || (r["สถานะ"]||"").includes("รอของ") || (r["สถานะ"]||"").includes("รับบางส่วน")).length);
   safe("s-approved", allPRs.filter(r => (r["สถานะ"]||"").includes("สำเร็จ")).length);
   safe("s-rejected", allPRs.filter(r => (r["สถานะ"]||"").includes("ปฏิเสธ")).length);
+  renderDeptSummary();
+}
+
+// ── สรุปยอดรายแผนก เดือนนี้ ──────────────────────────────────
+// แปลงวันที่ไทย "19/7/69" หรือ "19/7/2569" หรือ ISO → Date
+function parseThaiDate(v) {
+  if (!v) return null;
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) {
+    let y = +m[3];
+    if (y < 100)  y += 2500;   // "69" → 2569
+    if (y > 2400) y -= 543;    // พ.ศ. → ค.ศ.
+    return new Date(y, +m[2] - 1, +m[1]);
+  }
+  return null;
+}
+
+function renderDeptSummary() {
+  const box = document.getElementById("dept-summary");
+  if (!box) return;
+  const now = new Date();
+  const byDept = {};   // dept → { total, count, actual (มีราคาจริงบ้างมั้ย) }
+
+  allPRs.forEach(pr => {
+    const st = pr["สถานะ"] || "";
+    if (st.includes("ปฏิเสธ")) return;
+    const d = parseThaiDate(pr["วันที่ส่ง"]);
+    if (!d || d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return;
+
+    let amount = 0, hasActual = false;
+    try {
+      const items = JSON.parse(pr["รายการ JSON"] || "[]");
+      const actual = items.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.actualPrice)||0), 0);
+      if (actual > 0) { amount = actual; hasActual = true; }
+    } catch(e) {}
+    if (!amount) amount = parseFloat(pr["มูลค่ารวม (฿)"]) || 0;
+
+    const dept = pr["แผนก"] || "ไม่ระบุ";
+    if (!byDept[dept]) byDept[dept] = { total: 0, count: 0, actual: false };
+    byDept[dept].total += amount;
+    byDept[dept].count += 1;
+    if (hasActual) byDept[dept].actual = true;
+  });
+
+  const depts = Object.entries(byDept).sort((a, b) => b[1].total - a[1].total);
+  if (!depts.length) { box.innerHTML = ""; return; }
+
+  const grand  = depts.reduce((s, [,v]) => s + v.total, 0);
+  const maxVal = depts[0][1].total || 1;
+  const monthTh = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."][now.getMonth()];
+
+  box.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--gold-border);border-radius:10px;padding:14px 16px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+        <span style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.4px">💰 ยอดใช้จ่ายเดือน ${monthTh} ${now.getFullYear() + 543}</span>
+        <span style="font-family:var(--mono);font-size:15px;font-weight:600;color:#9B7330">฿${grand.toLocaleString("th-TH")}</span>
+      </div>
+      ${depts.map(([dept, v]) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:3px 0">
+          <span style="font-size:12px;width:120px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${dept}</span>
+          <div style="flex:1;height:14px;background:var(--bg);border-radius:7px;overflow:hidden">
+            <div style="width:${Math.max(3, Math.round(v.total / maxVal * 100))}%;height:100%;background:linear-gradient(90deg,var(--accent-mid),var(--gold));border-radius:7px"></div>
+          </div>
+          <span style="font-family:var(--mono);font-size:12px;width:90px;text-align:right;flex-shrink:0">฿${v.total.toLocaleString("th-TH")}</span>
+          <span style="font-size:11px;color:var(--text-3);width:36px;text-align:right;flex-shrink:0">${v.count} ใบ</span>
+        </div>`).join("")}
+      <div style="font-size:11px;color:var(--text-3);margin-top:8px">ใช้ราคาจริงเมื่อจัดซื้อกรอกแล้ว · ไม่รวมใบที่ถูกปฏิเสธ</div>
+    </div>`;
 }
 
 // ค้นหาจากทุกส่วนของใบ PR: ID, แผนก, คนขอ, หมายเหตุ, comment, ชื่อสินค้าใน JSON
