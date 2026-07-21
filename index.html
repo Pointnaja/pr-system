@@ -1476,7 +1476,7 @@ function renderMyPRs() {
             <span class="pr-id">${prId}</span>
             <span class="pr-dept">${pr["แผนก"] || "-"}</span>
           </div>
-          <div class="pr-meta">ส่งเมื่อ ${pr["วันที่ส่ง"]||"-"} · ต้องการ ${pr["วันที่ต้องการ"]||"-"} · ${urgRaw}</div>
+          <div class="pr-meta">ส่งเมื่อ ${fmtSent(pr["วันที่ส่ง"])} · ต้องการ ${pr["วันที่ต้องการ"]||"-"} · ${urgRaw}</div>
         </div>
         <span class="badge ${badgeCls}">${status}</span>
       </div>
@@ -2401,6 +2401,23 @@ function updateStats() {
 
 // ── สรุปยอดรายแผนก เดือนนี้ ──────────────────────────────────
 // แปลงวันที่ไทย "19/7/69" หรือ "19/7/2569" หรือ ISO → Date
+// แสดงวันที่ให้อ่านง่าย: ถ้าเป็น ISO (ของเก่าที่ Sheets แปลงไว้) → แปลงเป็น d/M/พ.ศ. HH:mm
+function fmtSent(v) {
+  if (!v) return "-";
+  const s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+    const d = new Date(s);
+    if (!isNaN(d)) {
+      const p = new Intl.DateTimeFormat("th-TH-u-ca-buddhist", {
+        timeZone:"Asia/Bangkok", day:"numeric", month:"numeric",
+        year:"numeric", hour:"2-digit", minute:"2-digit"
+      }).format(d);
+      return p;
+    }
+  }
+  return s;   // ข้อความไทยอยู่แล้ว แสดงตามเดิม
+}
+
 function parseThaiDate(v) {
   if (!v) return null;
   const s = String(v).trim();
@@ -2420,40 +2437,48 @@ function renderDeptSummary() {
   const box = document.getElementById("dept-summary");
   if (!box) return;
   const now = new Date();
-  const byDept = {};   // dept → { total, count, actual (มีราคาจริงบ้างมั้ย) }
 
-  allPRs.forEach(pr => {
-    const st = pr["สถานะ"] || "";
-    if (st.includes("ปฏิเสธ")) return;
+  // จัดกลุ่มยอดตามแผนกจากชุด PR ที่ให้มา
+  function groupByDept(list) {
+    const byDept = {};
+    list.forEach(pr => {
+      let amount = 0;
+      try {
+        const items = JSON.parse(pr["รายการ JSON"] || "[]");
+        const actual = items.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.actualPrice)||0), 0);
+        if (actual > 0) amount = actual;
+      } catch(e) {}
+      if (!amount) amount = parseFloat(pr["มูลค่ารวม (฿)"]) || 0;
+      const dept = pr["แผนก"] || "ไม่ระบุ";
+      if (!byDept[dept]) byDept[dept] = { total: 0, count: 0 };
+      byDept[dept].total += amount;
+      byDept[dept].count += 1;
+    });
+    return Object.entries(byDept).sort((a, b) => b[1].total - a[1].total);
+  }
+
+  const notRejected = allPRs.filter(pr => !(pr["สถานะ"] || "").includes("ปฏิเสธ"));
+  const thisMonth   = notRejected.filter(pr => {
     const d = parseThaiDate(pr["วันที่ส่ง"]);
-    if (!d || d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return;
-
-    let amount = 0, hasActual = false;
-    try {
-      const items = JSON.parse(pr["รายการ JSON"] || "[]");
-      const actual = items.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.actualPrice)||0), 0);
-      if (actual > 0) { amount = actual; hasActual = true; }
-    } catch(e) {}
-    if (!amount) amount = parseFloat(pr["มูลค่ารวม (฿)"]) || 0;
-
-    const dept = pr["แผนก"] || "ไม่ระบุ";
-    if (!byDept[dept]) byDept[dept] = { total: 0, count: 0, actual: false };
-    byDept[dept].total += amount;
-    byDept[dept].count += 1;
-    if (hasActual) byDept[dept].actual = true;
+    return d && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
 
-  const depts = Object.entries(byDept).sort((a, b) => b[1].total - a[1].total);
+  // ใช้ข้อมูลเดือนนี้ถ้ามี ไม่งั้น fallback แสดงทั้งหมด (กันกล่องหายเมื่อวันที่ในชีตเพี้ยน)
+  const useMonth = thisMonth.length > 0;
+  const depts = groupByDept(useMonth ? thisMonth : notRejected);
   if (!depts.length) { box.innerHTML = ""; return; }
 
   const grand  = depts.reduce((s, [,v]) => s + v.total, 0);
   const maxVal = depts[0][1].total || 1;
   const monthTh = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."][now.getMonth()];
+  const heading = useMonth
+    ? `💰 ยอดใช้จ่ายเดือน ${monthTh} ${now.getFullYear() + 543}`
+    : `💰 ยอดใช้จ่ายรวม (ทุกช่วงเวลา)`;
 
   box.innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--gold-border);border-radius:10px;padding:14px 16px;margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
-        <span style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.4px">💰 ยอดใช้จ่ายเดือน ${monthTh} ${now.getFullYear() + 543}</span>
+        <span style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.4px">${heading}</span>
         <span style="font-family:var(--mono);font-size:15px;font-weight:600;color:#9B7330">฿${grand.toLocaleString("th-TH")}</span>
       </div>
       ${depts.map(([dept, v]) => `
@@ -2539,7 +2564,7 @@ function renderPRs(list) {
     const senderName = pr["ชื่อ Line"] || pr["ผู้ส่ง"] || "-";
     const senderId   = pr["Line UserID"] || "-";
     const needDate   = pr["วันที่ต้องการ"] || "-";
-    const sentDate   = pr["วันที่ส่ง"] || "-";
+    const sentDate   = fmtSent(pr["วันที่ส่ง"]);
 
     // parse items — column "รายการ JSON" (ซ่อนอยู่ใน Sheet แต่ยังส่งมาใน JSON)
     let itemsData = [];
@@ -2885,7 +2910,7 @@ function printPR(prId) {
   </div>
   <div class="header-right">
     <div class="date-label">วันที่ส่ง</div>
-    <div class="date-val">${pr["วันที่ส่ง"] || "—"}</div>
+    <div class="date-val">${fmtSent(pr["วันที่ส่ง"])}</div>
     <div class="status-chip">${pr["สถานะ"] || "—"}</div>
   </div>
 </div>
