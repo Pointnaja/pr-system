@@ -328,6 +328,23 @@ body {
 .search-box:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(196,147,63,0.12); }
 .search-box::placeholder { color: var(--text-3); }
 
+/* ─── แถบพับรายการที่เสร็จสิ้นแล้ว ─── */
+.done-toggle {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 14px; margin-top: 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1.5px dashed var(--border-strong);
+  color: var(--text-3); font-size: 12.5px;
+  cursor: pointer; user-select: none;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.done-toggle:hover { border-color: var(--gold); color: #9B7330; background: var(--gold-light); }
+.done-toggle-arrow { font-size: 10px; transition: transform 0.2s; }
+.done-toggle-arrow.open { transform: rotate(90deg); }
+.done-section { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.done-section .my-pr-card { margin-bottom: 0; }
+
 .refresh-btn {
   margin-left: auto;
   display: flex; align-items: center; gap: 6px;
@@ -1072,8 +1089,7 @@ body {
           <option>Event</option>
         </select>
         <select id="f-fstatus" onchange="applyFilter()">
-          <option value="">งานค้าง (ซ่อนสำเร็จ)</option>
-          <option value="all">ทั้งหมด</option>
+          <option value="">ทุกสถานะ</option>
           <option value="รออนุมัติ">🔵 รออนุมัติ</option>
           <option value="รอดำเนินการ">🟡 รอดำเนินการ</option>
           <option value="รับทราบ">👀 รับทราบแล้ว</option>
@@ -1444,7 +1460,7 @@ function renderMyPRs() {
     const bi = parseInt((b["PR ID"] || "PR-0").replace("PR-", "")) || 0;
     return bi - ai;
   });
-  container.innerHTML = sortedPRs.map(pr => {
+  const renderMyCard = (pr) => {
     const prId     = pr["PR ID"] || "";
     const status   = pr["สถานะ"] || "";
     const isPending= status.includes("รอดำเนินการ") || status.includes("รออนุมัติ");
@@ -1669,8 +1685,28 @@ function renderMyPRs() {
       </div>
       `}
     </div>`;
-  }).join("");
+  };
+
+  // แยกใบที่เสร็จสิ้นแล้วไปพับไว้ด้านล่าง
+  const activePRs = sortedPRs.filter(pr => !(pr["สถานะ"] || "").includes("สำเร็จ"));
+  const donePRs   = sortedPRs.filter(pr =>  (pr["สถานะ"] || "").includes("สำเร็จ"));
+
+  let html = activePRs.length
+    ? activePRs.map(renderMyCard).join("")
+    : (donePRs.length ? '<div class="empty" style="padding:24px"><span class="empty-icon">🎉</span>ไม่มี PR ที่ต้องติดตาม</div>' : "");
+
+  if (donePRs.length) {
+    html += `<div class="done-toggle" onclick="toggleMyDone()">
+      <span class="done-toggle-arrow${myShowDone ? " open" : ""}">▶</span>
+      ✅ เสร็จสิ้นแล้ว ${donePRs.length} รายการ — กดเพื่อ${myShowDone ? "ซ่อน" : "ดู"}
+    </div>`;
+    if (myShowDone) html += `<div class="done-section">${donePRs.map(renderMyCard).join("")}</div>`;
+  }
+  container.innerHTML = html;
 }
+
+let myShowDone = false;
+function toggleMyDone() { myShowDone = !myShowDone; renderMyPRs(); }
 
 function openMyEdit(prId) {
   const pr = myPRs.find(r => r["PR ID"] === prId);
@@ -2601,9 +2637,7 @@ function applyFilter() {
     const st = r["สถานะ"] || '';
     if (!prMatchesSearch(r, q)) return false;
     if (fDept   && r["แผนก"]        !== fDept)   return false;
-    if (fStatus === "all") { /* แสดงทุกสถานะ */ }
-    else if (fStatus && !st.includes(fStatus)) return false;
-    else if (!fStatus && !q && st.includes("สำเร็จ")) return false;  // ซ่อนสำเร็จเฉพาะตอนไม่ได้ค้นหา
+    if (fStatus && !st.includes(fStatus))        return false;
     if (fUrg    && r["ความเร่งด่วน"] !== fUrg)   return false;
     return true;
   });
@@ -2624,7 +2658,7 @@ function renderPRs(list) {
     return;
   }
 
-  container.innerHTML = list.map(pr => {
+  const renderCard = (pr) => {
     const status    = String(pr["สถานะ"] || pr["status"] || "🟡 รอดำเนินการ");
     const isPending = status.includes("รอดำเนินการ");
     const urgRaw    = pr["ความเร่งด่วน"] || "";
@@ -2926,8 +2960,30 @@ function renderPRs(list) {
         ${!status.includes('ปฏิเสธ') && comment ? `<div class="pr-comment">💬 ${comment}</div>` : ""}
       </div>
     `;
-  }).join("");
+  };
+
+  // แยกใบที่สำเร็จแล้วไปพับไว้ด้านล่าง (ยกเว้นตอนกรองดูเฉพาะ "สำเร็จ")
+  const fStatus  = document.getElementById("f-fstatus")?.value || "";
+  const doneRows = list.filter(pr => String(pr["สถานะ"] || "").includes("สำเร็จ"));
+  const actRows  = list.filter(pr => !String(pr["สถานะ"] || "").includes("สำเร็จ"));
+  const useToggle = doneRows.length > 0 && !fStatus.includes("สำเร็จ");
+
+  let html = (useToggle ? actRows : list).map(renderCard).join("");
+  if (useToggle && !actRows.length)
+    html = '<div class="empty" style="padding:24px"><span class="empty-icon">🎉</span>ไม่มีงานค้าง</div>';
+
+  if (useToggle) {
+    html += `<div class="done-toggle" onclick="toggleAdminDone()">
+      <span class="done-toggle-arrow${adminShowDone ? " open" : ""}">▶</span>
+      ✅ เสร็จสิ้นแล้ว ${doneRows.length} รายการ — กดเพื่อ${adminShowDone ? "ซ่อน" : "ดู"}
+    </div>`;
+    if (adminShowDone) html += `<div class="done-section">${doneRows.map(renderCard).join("")}</div>`;
+  }
+  container.innerHTML = html;
 }
+
+let adminShowDone = false;
+function toggleAdminDone() { adminShowDone = !adminShowDone; applyFilter(); }
 
 
 function toggleExpand(id) {
