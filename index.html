@@ -1328,6 +1328,22 @@ function itemStatusChip(st) {
   return `<span style="font-size:11px;padding:1px 8px;border-radius:10px;background:${s.bg};color:${s.color};white-space:nowrap">${s.icon} ${s.th}</span>`;
 }
 
+// chip แสดงผลการรับของ: ครบ / ได้ไม่ครบรอต่อ / ปิดทั้งที่ขาด
+function receiveChip(it) {
+  const ordered = parseFloat(it.qty) || 0;
+  const got     = parseFloat(it.receivedQty) || 0;
+  const pill = (bg, color, text) =>
+    `<span style="font-size:11px;padding:1px 8px;border-radius:10px;background:${bg};color:${color};white-space:nowrap">${text}</span>`;
+
+  if (it.received && it.shortClosed)
+    return pill("#FEE2E2", "#991B1B", `✔ ปิดแล้ว ได้ ${got}/${ordered}`);
+  if (it.received)
+    return pill("#DCFCE7", "#14532D", `✔ รับแล้ว ${it.receivedAt || ""}`);
+  if (got > 0)
+    return pill("#FFEDD5", "#C2410C", `🟡 ได้ ${got}/${ordered} · ขาด ${ordered - got}`);
+  return "";
+}
+
 // สรุป "มาแล้ว x/y · ไม่มีของ n" — คืน "" ถ้ายังไม่มีการติ๊กสถานะเลย
 function itemStatusSummary(items) {
   if (!Array.isArray(items) || !items.length) return "";
@@ -1549,20 +1565,46 @@ function renderMyPRs() {
         ${(() => {
           const canReceive = status.includes("สั่งแล้ว") || status.includes("รอของ") || status.includes("รับบางส่วน");
           const line = (it, idx) => {
-            const sub    = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
-            const actSub = (parseFloat(it.qty)||0)*(parseFloat(it.actualPrice)||0);
+            const sub     = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
+            const actSub  = (parseFloat(it.qty)||0)*(parseFloat(it.actualPrice)||0);
             const showChk = canReceive && !it.received && it.itemStatus !== "unavailable";
-            return `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);align-items:flex-start">
-              <span style="display:flex;gap:8px;align-items:flex-start">
-                ${showChk ? `<input type="checkbox" class="rcv-chk-${prId}" data-idx="${idx}" onchange="updateReceiveBtn('${prId}')" style="width:17px;height:17px;margin-top:2px;accent-color:var(--accent);cursor:pointer">` : ""}
-                <span>
-                  ${it.name} <span style="color:var(--text-3)">${it.qty} ${it.unit}</span> ${itemStatusChip(it.itemStatus)}
-                  ${it.received ? `<span style="font-size:11px;padding:1px 8px;border-radius:10px;background:#DCFCE7;color:#14532D;white-space:nowrap">✔ รับแล้ว ${it.receivedAt||''}</span>` : ""}
+            const ordered = parseFloat(it.qty) || 0;
+            const already = parseFloat(it.receivedQty) || 0;
+            const remain  = Math.max(0, ordered - already);
+            return `<div style="padding:5px 0;border-bottom:1px solid var(--border)">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+                <span style="display:flex;gap:8px;align-items:flex-start">
+                  ${showChk ? `<input type="checkbox" class="rcv-chk-${prId}" data-idx="${idx}" onchange="onRcvToggle('${prId}',${idx})" style="width:17px;height:17px;margin-top:2px;accent-color:var(--accent);cursor:pointer">` : ""}
+                  <span>
+                    ${it.name} <span style="color:var(--text-3)">${it.qty} ${it.unit}</span> ${itemStatusChip(it.itemStatus)} ${receiveChip(it)}
+                    ${it.shortNote ? `<div style="font-size:11px;color:var(--text-3);font-style:italic">📝 ${it.shortNote}</div>` : ""}
+                  </span>
                 </span>
-              </span>
-              <span style="font-family:var(--mono);white-space:nowrap">${actSub>0
-                ? `<span style="color:#9B7330;font-weight:600">฿${actSub.toLocaleString("th-TH")}</span>`
-                : (sub>0?"฿"+sub.toLocaleString("th-TH"):"")}</span>
+                <span style="font-family:var(--mono);white-space:nowrap">${actSub>0
+                  ? `<span style="color:#9B7330;font-weight:600">฿${actSub.toLocaleString("th-TH")}</span>`
+                  : (sub>0?"฿"+sub.toLocaleString("th-TH"):"")}</span>
+              </div>
+              ${showChk ? `
+              <div id="rdet-${prId}-${idx}" style="display:none;margin:6px 0 4px 25px;padding:8px 10px;background:var(--bg);border-radius:7px">
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;flex-wrap:wrap">
+                  <span style="color:var(--text-2)">รับได้จริง</span>
+                  <input type="number" id="rq-${prId}-${idx}" value="${remain}" min="0" max="${remain}" step="any" inputmode="decimal"
+                    oninput="onRcvQty('${prId}',${idx},${remain})"
+                    style="width:64px;text-align:center;padding:5px;border:1px solid var(--border);border-radius:5px;font-family:var(--sans);font-size:13px;background:var(--surface)">
+                  <span style="color:var(--text-3)">/ ${remain} ${it.unit||""}${already>0?` (ได้ไปแล้ว ${already})`:""}</span>
+                </div>
+                <div id="rshort-${prId}-${idx}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
+                  <div style="font-size:12px;color:var(--warn);font-weight:500;margin-bottom:5px">⚠️ ได้ไม่ครบ — ส่วนที่ขาดจะทำยังไง?</div>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer">
+                    <input type="radio" name="sopt-${prId}-${idx}" value="wait" checked style="accent-color:var(--accent)"> รอของที่เหลือ (จัดซื้อตามต่อ)
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer">
+                    <input type="radio" name="sopt-${prId}-${idx}" value="close" style="accent-color:var(--danger)"> ปิดเลย ไม่ตามแล้ว
+                  </label>
+                  <input type="text" id="snote-${prId}-${idx}" placeholder="หมายเหตุ เช่น ร้านส่งขาด, ของเสีย 2 ชิ้น"
+                    style="width:100%;margin-top:6px;padding:6px 9px;border:1px solid var(--border);border-radius:5px;font-family:var(--sans);font-size:12px;background:var(--surface)">
+                </div>
+              </div>` : ""}
             </div>`;
           };
           const lots = [...new Set(items.map(i => i.lot).filter(Boolean))].sort();
@@ -1828,13 +1870,56 @@ function updateReceiveBtn(prId) {
   btn.textContent = checked === 0 ? "📦 บันทึกการรับของ" : "📦 บันทึกการรับของ (" + checked + ")";
 }
 
+// ติ๊ก/ยกเลิกติ๊กรายการ → เปิด-ปิดช่องกรอกจำนวนที่ได้จริง
+function onRcvToggle(prId, idx) {
+  const chk = document.querySelector(".rcv-chk-" + CSS.escape(prId) + "[data-idx='" + idx + "']");
+  const det = document.getElementById("rdet-" + prId + "-" + idx);
+  if (det) det.style.display = (chk && chk.checked) ? "block" : "none";
+  updateReceiveBtn(prId);
+}
+
+// กรอกจำนวนน้อยกว่าที่ค้าง → โชว์ตัวเลือกว่าจะรอของที่เหลือหรือปิดเลย
+function onRcvQty(prId, idx, remain) {
+  const inp   = document.getElementById("rq-" + prId + "-" + idx);
+  const short = document.getElementById("rshort-" + prId + "-" + idx);
+  if (!inp || !short) return;
+  const got = parseFloat(inp.value);
+  short.style.display = (!isNaN(got) && got < remain) ? "block" : "none";
+}
+
 async function saveReceive(prId, all) {
-  let receivedIdx = [];
+  let receiveList = [];
   if (!all) {
-    receivedIdx = [...document.querySelectorAll(".rcv-chk-" + CSS.escape(prId) + ":checked")]
-      .map(c => parseInt(c.dataset.idx, 10));
-    if (!receivedIdx.length) return;
-    if (!confirm("บันทึกการรับของ " + receivedIdx.length + " รายการ?")) return;
+    const checked = [...document.querySelectorAll(".rcv-chk-" + CSS.escape(prId) + ":checked")];
+    if (!checked.length) return;
+
+    for (const c of checked) {
+      const idx   = parseInt(c.dataset.idx, 10);
+      const qtyEl = document.getElementById("rq-" + prId + "-" + idx);
+      const qty   = qtyEl ? qtyEl.value : "";
+      const max   = qtyEl ? parseFloat(qtyEl.max) : NaN;
+      const got   = parseFloat(qty);
+      if (qtyEl && (isNaN(got) || got <= 0)) {
+        alert("กรุณาใส่จำนวนที่รับได้จริง (มากกว่า 0)");
+        qtyEl.focus(); return;
+      }
+      if (!isNaN(max) && got > max) {
+        alert("จำนวนที่รับเกินจำนวนที่ค้างอยู่ (สูงสุด " + max + ")");
+        qtyEl.focus(); return;
+      }
+      const opt   = document.querySelector("input[name='sopt-" + CSS.escape(prId) + "-" + idx + "']:checked");
+      const noteEl = document.getElementById("snote-" + prId + "-" + idx);
+      receiveList.push({
+        idx,
+        qty,
+        close: !!(opt && opt.value === "close"),
+        note:  noteEl ? noteEl.value.trim() : "",
+      });
+    }
+    const shortCount = receiveList.filter(r => r.close).length;
+    let confirmMsg = "บันทึกการรับของ " + receiveList.length + " รายการ?";
+    if (shortCount) confirmMsg += "\n(มี " + shortCount + " รายการที่ปิดทั้งที่ได้ไม่ครบ — จะไม่ตามของที่ขาดอีก)";
+    if (!confirm(confirmMsg)) return;
   } else {
     if (!confirm("ยืนยันว่าได้รับของครบทุกรายการแล้ว?\nสถานะจะเปลี่ยนเป็น \"สำเร็จ\"")) return;
   }
@@ -1851,7 +1936,7 @@ async function saveReceive(prId, all) {
         lineUserId:  lineProfile.userId,
         displayName: lineProfile.displayName,
         all:         !!all,
-        receivedIdx,
+        receiveList,
       }),
       headers: { "Content-Type": "text/plain" },
     });
@@ -2723,7 +2808,8 @@ function renderPRs(list) {
                 <div style="display:flex;gap:10px;align-items:flex-start">
                   ${(it.img && (it.img.startsWith('data:') || it.img.startsWith('http'))) ? `<img src="${it.img}" class="admin-item-img" alt="${it.name}" data-fullsrc="${it.img.replace(/"/g,'&quot;')}" onclick="viewImg(this.getAttribute('data-fullsrc'))" title="คลิกเพื่อขยายรูป">` : ""}
                   <div>
-                    <div style="font-weight:500;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">${it.name} ${itemStatusChip(it.itemStatus)}${it.received ? `<span style="font-size:11px;padding:1px 8px;border-radius:10px;background:#DCFCE7;color:#14532D;white-space:nowrap">✔ รับแล้ว ${it.receivedAt||''}</span>` : ""}</div>
+                    <div style="font-weight:500;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">${it.name} ${itemStatusChip(it.itemStatus)}${receiveChip(it)}</div>
+                    ${it.shortNote ? `<div style="font-size:11px;color:var(--text-3);font-style:italic">📝 ${it.shortNote}</div>` : ""}
                     <div style="font-size:12px;color:var(--text-3)">${it.qty} ${it.unit}</div>
                     ${it.desc ? `<div style="font-size:12px;color:var(--text-2);margin-top:2px">${it.desc}</div>` : ""}
                     ${it.link ? `<a href="${it.link}" target="_blank" class="link-chip">🔗 ลิงก์</a>` : ""}
