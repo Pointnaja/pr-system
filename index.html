@@ -1587,12 +1587,16 @@ function renderMyPRs() {
             const ordered = parseFloat(it.qty) || 0;
             const already = parseFloat(it.receivedQty) || 0;
             const remain  = Math.max(0, ordered - already);
+            const hasImg = it.img && (it.img.startsWith('data:') || it.img.startsWith('http'));
             return `<div style="padding:5px 0;border-bottom:1px solid var(--border)">
               <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
                 <span style="display:flex;gap:8px;align-items:flex-start">
                   ${showChk ? `<input type="checkbox" class="rcv-chk-${prId}" data-idx="${idx}" onchange="onRcvToggle('${prId}',${idx})" style="width:17px;height:17px;margin-top:2px;accent-color:var(--accent);cursor:pointer">` : ""}
+                  ${hasImg ? `<img src="${it.img}" class="admin-item-img" alt="${it.name}" data-fullsrc="${it.img.replace(/"/g,'&quot;')}" onclick="viewImg(this.getAttribute('data-fullsrc'))" title="คลิกเพื่อขยายรูป">` : ""}
                   <span>
                     ${it.name} <span style="color:var(--text-3)">${it.qty} ${it.unit}</span> ${itemStatusChip(it.itemStatus)} ${receiveChip(it)}
+                    ${it.desc ? `<div style="font-size:11px;color:var(--text-2)">${it.desc}</div>` : ""}
+                    ${it.link ? `<a href="${it.link}" target="_blank" class="link-chip">🔗 ลิงก์</a>` : ""}
                     ${it.shortNote ? `<div style="font-size:11px;color:var(--text-3);font-style:italic">📝 ${it.shortNote}</div>` : ""}
                   </span>
                 </span>
