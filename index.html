@@ -1207,7 +1207,7 @@ async function initLiff() {
         userId:      profile.userId,
         displayName: profile.displayName,
         pictureUrl:  profile.pictureUrl || "",
-        idToken:     liff.getIDToken() || "",
+        idToken:     liff.getIDToken() || "",   // เก็บไว้เช็คตอน init เท่านั้น
       };
       showUserPill(profile.displayName, profile.pictureUrl);
 
@@ -1224,7 +1224,7 @@ async function initLiff() {
         userId:      profile.userId,
         displayName: profile.displayName,
         pictureUrl:  profile.pictureUrl || "",
-        idToken:     liff.getIDToken() || "",
+        idToken:     liff.getIDToken() || "",   // เก็บไว้เช็คตอน init เท่านั้น
       };
       showUserPill(profile.displayName, profile.pictureUrl);
     }
@@ -1236,6 +1236,24 @@ async function initLiff() {
     document.getElementById("liff-fallback").style.display = "block";
     lineProfile = { userId: "", displayName: "", pictureUrl: "" };
   }
+}
+
+// ── ID Token: ดึงสดทุกครั้ง (token มีอายุ ห้าม cache ไว้ตอน init) ──
+function freshIdToken() {
+  try {
+    if (typeof liff === "undefined" || !liff.getIDToken) return "";
+    return liff.getIDToken() || "";
+  } catch(e) { return ""; }
+}
+
+// ── กู้เมื่อ backend ตอบ NEED_LOGIN: ขอ consent ใหม่ (openid) ──
+function handleAuthError(msg) {
+  if (!msg || String(msg).indexOf("NEED_LOGIN") !== 0) return false;
+  if (confirm("เซสชัน LINE หมดอายุ หรือยังไม่ได้อนุญาตสิทธิ์ครบ\n\nกด OK เพื่อเข้าสู่ระบบ LINE ใหม่")) {
+    try { liff.logout(); } catch(e) {}
+    liff.login({ redirectUri: location.href });
+  }
+  return true;
 }
 
 function showUserPill(displayName, pictureUrl) {
@@ -1788,7 +1806,7 @@ async function saveMyEdit(prId) {
   try {
     const payload = {
       action:      "editPR",
-      idToken:     lineProfile.idToken || "",
+      idToken:     freshIdToken(),
       prId,
       lineUserId:  lineProfile.userId,
       displayName: lineProfile.displayName,
@@ -1807,7 +1825,7 @@ async function saveMyEdit(prId) {
       await loadMyPRs();   // refresh
       alert("✅ บันทึกสำเร็จ! ทีม Purchasing ได้รับแจ้งแล้ว");
     } else {
-      alert("❌ " + (result.error || "บันทึกไม่สำเร็จ"));
+      if (!handleAuthError(result.error)) alert("❌ " + (result.error || "บันทึกไม่สำเร็จ"));
     }
   } catch(err) {
     alert("เชื่อมต่อไม่ได้: " + err.message);
@@ -1976,7 +1994,7 @@ async function saveReceive(prId, all) {
       method: "POST",
       body: JSON.stringify({
         action:      "receiveItems",
-        idToken:     lineProfile.idToken || "",
+        idToken:     freshIdToken(),
         prId,
         lineUserId:  lineProfile.userId,
         displayName: lineProfile.displayName,
@@ -1992,7 +2010,7 @@ async function saveReceive(prId, all) {
         ? "✅ รับของครบแล้ว — PR สำเร็จ"
         : "📦 บันทึกแล้ว — รับของ " + result.received + "/" + result.total + " รายการ");
     } else {
-      alert("❌ " + (result.error || "บันทึกไม่สำเร็จ"));
+      if (!handleAuthError(result.error)) alert("❌ " + (result.error || "บันทึกไม่สำเร็จ"));
       await loadMyPRs();
     }
   } catch (err) {
@@ -2013,7 +2031,7 @@ async function confirmReceipt(prId) {
       method: "POST",
       body: JSON.stringify({
         action:      "confirmReceipt",
-        idToken:     lineProfile.idToken || "",
+        idToken:     freshIdToken(),
         prId,
         lineUserId:  lineProfile.userId,
         displayName: lineProfile.displayName,
@@ -2025,7 +2043,7 @@ async function confirmReceipt(prId) {
       await loadMyPRs();
       alert("✅ ยืนยันรับของเรียบร้อย — PR สำเร็จแล้ว");
     } else {
-      alert("❌ " + (result.error || "ยืนยันไม่สำเร็จ"));
+      if (!handleAuthError(result.error)) alert("❌ " + (result.error || "ยืนยันไม่สำเร็จ"));
       if (btn) { btn.disabled = false; btn.textContent = "✅ ยืนยันรับของแล้ว"; }
     }
   } catch (err) {
@@ -2435,7 +2453,7 @@ async function submitPR() {
     }
     const payload = {
       action:      "submit",
-      idToken:     lineProfile.idToken || "",
+      idToken:     freshIdToken(),
       dept,
       lineUserId:  lineProfile.userId,
       displayName: lineProfile.displayName,
@@ -2456,7 +2474,8 @@ async function submitPR() {
       showToast("success");
       resetForm();
     } else {
-      showToast("error", result.error || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      if (!handleAuthError(result.error))
+        showToast("error", result.error || "เกิดข้อผิดพลาด กรุณาลองใหม่");
     }
   } catch (err) {
     showToast("error", "ไม่สามารถเชื่อมต่อ Google Sheet ได้: " + err.message);
@@ -3134,7 +3153,7 @@ async function updateStatus(prId, status) {
   }
   const payload = {
     action: "updateStatus",
-    idToken: lineProfile.idToken || "",
+    idToken: freshIdToken(),
     prId,
     status,
     comment,
@@ -3153,7 +3172,7 @@ async function updateStatus(prId, status) {
     if (result.success) {
       await loadAdmin(true);
     } else {
-      alert("เกิดข้อผิดพลาด: " + result.error);
+      if (!handleAuthError(result.error)) alert("เกิดข้อผิดพลาด: " + result.error);
     }
   } catch (err) {
     alert("ไม่สามารถอัปเดตได้: " + err.message);
@@ -3176,7 +3195,7 @@ async function adminSaveEdit(prId) {
   try {
     const res = await fetch(CONFIG.WEBHOOK_URL, {
       method: "POST",
-      body: JSON.stringify({ action:"adminEditItems", idToken: lineProfile.idToken || "", prId, items, adminUserId: lineProfile.userId || "", updatedBy: adminName || "Admin" }),
+      body: JSON.stringify({ action:"adminEditItems", idToken: freshIdToken(), prId, items, adminUserId: lineProfile.userId || "", updatedBy: adminName || "Admin" }),
       headers: { "Content-Type":"text/plain" },
     });
     const result = await res.json();
@@ -3184,7 +3203,7 @@ async function adminSaveEdit(prId) {
       showToast("ok", "✅ บันทึกรายการแล้ว");
       await loadAdmin(true);
     } else {
-      showToast("err", result.error || "บันทึกไม่ได้");
+      if (!handleAuthError(result.error)) showToast("err", result.error || "บันทึกไม่ได้");
       editMode[prId] = true; applyFilter();
     }
   } catch(err) {
