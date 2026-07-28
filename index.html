@@ -1331,7 +1331,7 @@ async function loadMyPRs() {
   try {
     const res    = await fetch(CONFIG.WEBHOOK_URL, {
       method: "POST",
-      body: JSON.stringify({ action: "getMyPRs", userId: lineProfile.userId }),
+      body: JSON.stringify({ action: "getMyPRs", userId: lineProfile.userId, idToken: freshIdToken() }),
       headers: { "Content-Type": "text/plain" },
     });
     const result = await res.json();
