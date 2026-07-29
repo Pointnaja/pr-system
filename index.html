@@ -960,7 +960,7 @@ body {
           <!-- หมายเหตุ -->
           <div class="field span2">
             <label>หมายเหตุ / เหตุผลการขอจัดซื้อ</label>
-            <textarea id="f-note" placeholder="อธิบายบริบทหรือเหตุผลเพิ่มเติม..."></textarea>
+            <textarea id="f-note" placeholder="อธิบายเหตุผล หรือระบุร้านที่ต้องซื้อ (ถ้ามีร้านเจาะจง)..."></textarea>
           </div>
 
           <!-- รายการสินค้า -->
@@ -1161,6 +1161,7 @@ body {
 
 <!-- B2: autocomplete ชื่อสินค้าจากประวัติ -->
 <datalist id="item-names"></datalist>
+<datalist id="vendor-names"></datalist>
 
 <script>
 // ═══════════════════════════════════════════════
@@ -1529,7 +1530,7 @@ function renderMyPRs() {
             <span class="pr-id">${prId}</span>
             <span class="pr-dept">${pr["แผนก"] || "-"}</span>
           </div>
-          <div class="pr-meta">ส่งเมื่อ ${fmtSent(pr["วันที่ส่ง"])} · ต้องการ ${pr["วันที่ต้องการ"]||"-"} · ${urgRaw}</div>
+          <div class="pr-meta">ส่งเมื่อ ${fmtSent(pr["วันที่ส่ง"])} · ต้องการ ${pr["วันที่ต้องการ"]||"-"} · ${urgRaw}${pr["ร้านค้า/แหล่งซื้อ"] ? ` · <span style="color:#9B7330;font-weight:500">🏪 ${pr["ร้านค้า/แหล่งซื้อ"]}</span>` : ""}</div>
         </div>
         <span class="badge ${badgeCls}">${status}</span>
       </div>
@@ -2555,6 +2556,19 @@ function updateStats() {
   safe("s-approved", allPRs.filter(r => (r["สถานะ"]||"").includes("สำเร็จ")).length);
   safe("s-rejected", allPRs.filter(r => (r["สถานะ"]||"").includes("ปฏิเสธ")).length);
   renderDeptSummary();
+  updateVendorSuggestions();
+}
+
+// รวมชื่อร้านที่เคยใช้ → datalist ให้เลือกแทนพิมพ์ซ้ำ
+function updateVendorSuggestions() {
+  const dl = document.getElementById("vendor-names");
+  if (!dl) return;
+  const names = new Set();
+  allPRs.forEach(pr => {
+    const v = (pr["ร้านค้า/แหล่งซื้อ"] || "").trim();
+    if (v) names.add(v);
+  });
+  dl.innerHTML = [...names].sort().map(n => `<option value="${escAttr(n)}">`).join("");
 }
 
 // ── สรุปยอดรายแผนก เดือนนี้ ──────────────────────────────────
@@ -2763,6 +2777,7 @@ function renderPRs(list) {
               ${urgRaw ? " · " + urgRaw : ""}
               ${eta ? ` · <span style="color:#0077B6;font-weight:500">📦 คาดว่าถึง ${eta}</span>` : ""}
               ${updatedBy ? ` · <span style="color:var(--text-3)">by ${updatedBy}</span>` : ""}
+              ${pr["ร้านค้า/แหล่งซื้อ"] ? ` · <span style="color:#9B7330;font-weight:500">🏪 ${pr["ร้านค้า/แหล่งซื้อ"]}</span>` : ""}
             </div>
           </div>
           <span class="badge ${badgeCls}">${status}</span>
@@ -2976,6 +2991,12 @@ function renderPRs(list) {
             ? `<div class="step-action-area">
                 <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ...">
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                  <label style="font-size:11px;color:var(--text-3);white-space:nowrap">🏪 ร้านค้า:</label>
+                  <input type="text" id="vendor-${prId}" list="vendor-names"
+                    value="${escAttr(pr['ร้านค้า/แหล่งซื้อ'] || '')}" placeholder="ร้านที่ซื้อ..." autocomplete="off"
+                    style="width:150px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:var(--sans);font-size:12px;background:var(--bg);color:var(--text)">
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                   <label style="font-size:11px;color:var(--text-3);white-space:nowrap">📦 คาดว่าของถึง:</label>
                   <input type="date" id="eta-${prId}" value="${pr['วันที่คาดว่าของจะถึง']||''}"
                     style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:var(--sans);font-size:12px;background:var(--bg);color:var(--text)">
@@ -3151,6 +3172,7 @@ async function updateStatus(prId, status) {
     }
     comment = reason.trim();
   }
+  const vendor = document.getElementById("vendor-" + prId)?.value.trim() || "";
   const payload = {
     action: "updateStatus",
     idToken: freshIdToken(),
@@ -3158,6 +3180,7 @@ async function updateStatus(prId, status) {
     status,
     comment,
     estimatedArrival,
+    vendor,
     updatedBy: adminName || "Admin",
     adminUserId: lineProfile.userId || ""
   };
