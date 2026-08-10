@@ -939,10 +939,13 @@ body {
             <!-- แสดงเมื่อ LIFF โหลดสำเร็จ -->
             <div id="user-pill" class="user-pill" style="display:none">
               <div class="user-pill-avatar" id="user-pill-avatar">?</div>
-              <div>
+              <div style="flex:1;min-width:0">
                 <div class="user-pill-name" id="user-pill-name">—</div>
                 <div class="user-pill-sub">ดึงจาก LINE Profile อัตโนมัติ ✓</div>
               </div>
+              <button type="button" onclick="logoutAllDevices()" title="ออกจากระบบทุกเครื่อง (ใช้เมื่อมือถือหาย)"
+                style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-3);
+                text-decoration:underline;white-space:nowrap;padding:4px 2px;font-family:var(--sans)">ออกจากระบบ</button>
             </div>
             <!-- แสดงระหว่างโหลด -->
             <div id="liff-loading" class="liff-loading">
@@ -1287,6 +1290,62 @@ async function initLiff() {
   }
 }
 
+// ═══════════════════════════════════════════════
+//  Session ระบบเอง — อายุ 30 วัน เก็บใน localStorage
+//  ไม่ต้องพึ่ง LINE ID token ที่หมดอายุเร็ว
+// ═══════════════════════════════════════════════
+const SESS_KEY = "vpPrSession";
+
+function getSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESS_KEY) || "null");
+    // เผื่อเวลาไว้ 1 ชม. — ต่ออายุก่อนหมดจริง จะได้ไม่สะดุดกลางคัน
+    if (!s || !s.token || !s.exp || Date.now() > s.exp - 3600000) return null;
+    return s;
+  } catch(e) { return null; }
+}
+
+function sessionToken() { const s = getSession(); return s ? s.token : ""; }
+function clearSession()  { try { localStorage.removeItem(SESS_KEY); } catch(e) {} }
+
+// ขอ session ใหม่ด้วย LINE ID token (เรียกครั้งเดียวหลัง login)
+async function ensureSession() {
+  if (getSession()) return true;
+  const idt = freshIdToken();
+  if (!idt) return false;
+  try {
+    const res = await fetch(CONFIG.WEBHOOK_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "startSession", idToken: idt }),
+      headers: { "Content-Type": "text/plain" },
+    });
+    const r = await res.json();
+    if (r.success && r.sessionToken) {
+      localStorage.setItem(SESS_KEY, JSON.stringify({ token:r.sessionToken, exp:r.exp, uid:r.userId }));
+      return true;
+    }
+  } catch(e) { console.log("startSession error:", e.message); }
+  return false;
+}
+
+// ออกจากระบบทุกเครื่อง (เผื่อมือถือหาย)
+async function logoutAllDevices() {
+  if (!confirm("ออกจากระบบทุกเครื่องที่เคยเข้าใช้?\n\nใช้เมื่อทำมือถือหาย หรือเคยเข้าจากเครื่องที่ไม่ใช่ของตัวเอง")) return;
+  try {
+    const res = await fetch(CONFIG.WEBHOOK_URL, {
+      method: "POST",
+      body: JSON.stringify({ action:"revokeAllSessions", sessionToken: sessionToken(), idToken: freshIdToken() }),
+      headers: { "Content-Type": "text/plain" },
+    });
+    const r = await res.json();
+    clearSession();
+    alert(r.success ? "ออกจากระบบทุกเครื่องแล้ว (" + r.revoked + " เครื่อง)\nกรุณาเข้าสู่ระบบใหม่"
+                    : "ทำรายการไม่สำเร็จ: " + (r.error || ""));
+  } catch(e) { alert("เชื่อมต่อไม่ได้: " + e.message); }
+  try { liff.logout(); } catch(e) {}
+  location.reload();
+}
+
 // ── ID Token: ดึงสดทุกครั้ง (token มีอายุ ห้าม cache ไว้ตอน init) ──
 function freshIdToken() {
   try {
@@ -1298,7 +1357,8 @@ function freshIdToken() {
 // ── กู้เมื่อ backend ตอบ NEED_LOGIN: ขอ consent ใหม่ (openid) ──
 function handleAuthError(msg) {
   if (!msg || String(msg).indexOf("NEED_LOGIN") !== 0) return false;
-  if (confirm("เซสชัน LINE หมดอายุ หรือยังไม่ได้อนุญาตสิทธิ์ครบ\n\nกด OK เพื่อเข้าสู่ระบบ LINE ใหม่")) {
+  if (confirm("เซสชันหมดอายุ หรือยังไม่ได้อนุญาตสิทธิ์ครบ\n\nกด OK เพื่อเข้าสู่ระบบ LINE ใหม่")) {
+    clearSession();
     try { liff.logout(); } catch(e) {}
     liff.login({ redirectUri: location.href });
   }
@@ -1322,8 +1382,10 @@ function showUserPill(displayName, pictureUrl) {
   document.getElementById("browser-login").style.display  = "none";
   pill.style.display = "flex";
 
-  // โหลดประวัติ PR เงียบๆ เพื่อให้ autocomplete ชื่อสินค้าพร้อมใช้ทันที
-  loadMyPRs().catch(() => {});
+  // ขอ session 30 วันก่อน แล้วค่อยโหลดข้อมูล (ไม่งั้น request แรกจะไม่มี session)
+  ensureSession()
+    .then(() => loadMyPRs())
+    .catch(() => {});
 
   // B10: ทีมจัดซื้อ/ผู้จัดการ — ข้าม password gate อัตโนมัติ
   if (CONFIG.ADMIN_USER_IDS.includes(lineProfile.userId)) {
@@ -1380,7 +1442,7 @@ async function loadMyPRs() {
   try {
     const res    = await fetch(CONFIG.WEBHOOK_URL, {
       method: "POST",
-      body: JSON.stringify({ action: "getMyPRs", userId: lineProfile.userId, idToken: freshIdToken() }),
+      body: JSON.stringify({ action: "getMyPRs", userId: lineProfile.userId, idToken: freshIdToken(), sessionToken: sessionToken() }),
       headers: { "Content-Type": "text/plain" },
     });
     const result = await res.json();
@@ -1859,6 +1921,7 @@ async function saveMyEdit(prId) {
     const payload = {
       action:      "editPR",
       idToken:     freshIdToken(),
+      sessionToken: sessionToken(),
       prId,
       lineUserId:  lineProfile.userId,
       displayName: lineProfile.displayName,
@@ -2047,6 +2110,7 @@ async function saveReceive(prId, all) {
       body: JSON.stringify({
         action:      "receiveItems",
         idToken:     freshIdToken(),
+      sessionToken: sessionToken(),
         prId,
         lineUserId:  lineProfile.userId,
         displayName: lineProfile.displayName,
@@ -2084,6 +2148,7 @@ async function confirmReceipt(prId) {
       body: JSON.stringify({
         action:      "confirmReceipt",
         idToken:     freshIdToken(),
+      sessionToken: sessionToken(),
         prId,
         lineUserId:  lineProfile.userId,
         displayName: lineProfile.displayName,
@@ -2506,6 +2571,7 @@ async function submitPR() {
     const payload = {
       action:      "submit",
       idToken:     freshIdToken(),
+      sessionToken: sessionToken(),
       dept,
       lineUserId:  lineProfile.userId,
       displayName: lineProfile.displayName,
@@ -3227,6 +3293,7 @@ async function updateStatus(prId, status) {
   const payload = {
     action: "updateStatus",
     idToken: freshIdToken(),
+    sessionToken: sessionToken(),
     prId,
     status,
     comment,
@@ -3269,7 +3336,8 @@ async function adminSaveEdit(prId) {
   try {
     const res = await fetch(CONFIG.WEBHOOK_URL, {
       method: "POST",
-      body: JSON.stringify({ action:"adminEditItems", idToken: freshIdToken(), prId, items, adminUserId: lineProfile.userId || "", updatedBy: adminName || "Admin" }),
+      body: JSON.stringify({ action:"adminEditItems", idToken: freshIdToken(), sessionToken: sessionToken(),
+        prId, items, adminUserId: lineProfile.userId || "", updatedBy: adminName || "Admin" }),
       headers: { "Content-Type":"text/plain" },
     });
     const result = await res.json();
