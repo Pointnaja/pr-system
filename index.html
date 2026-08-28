@@ -328,6 +328,20 @@ body {
 .search-box:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(196,147,63,0.12); }
 .search-box::placeholder { color: var(--text-3); }
 
+/* ─── checkbox ของใหญ่/ครุภัณฑ์ ─── */
+.bigitem-box {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; cursor: pointer;
+  background: var(--gold-light);
+  border: 1px solid var(--gold-border);
+  border-radius: 9px;
+  transition: border-color .15s, background .15s;
+}
+.bigitem-box:has(input:checked) { border-color: var(--gold); background: #FBEDD2; }
+.bigitem-box input { width: 19px; height: 19px; margin-top: 1px; flex-shrink: 0; accent-color: var(--gold); cursor: pointer; }
+.bigitem-title { display: block; font-size: 13.5px; font-weight: 600; color: #7A5B18; }
+.bigitem-sub   { display: block; font-size: 11.5px; color: #9B7330; margin-top: 3px; line-height: 1.45; }
+
 /* ─── แถบพับรายการที่เสร็จสิ้นแล้ว ─── */
 .done-toggle {
   display: flex; align-items: center; gap: 8px;
@@ -1008,6 +1022,17 @@ body {
             </div>
           </div>
 
+          <!-- ของใหญ่/ครุภัณฑ์ → ต้องให้ผู้จัดการอนุมัติก่อน -->
+          <div class="field span2">
+            <label class="bigitem-box">
+              <input type="checkbox" id="f-bigitem">
+              <span>
+                <span class="bigitem-title">เป็นของใหญ่ / ครุภัณฑ์ / ของราคาสูง</span>
+                <span class="bigitem-sub">เช่น เครื่องใช้ไฟฟ้า เฟอร์นิเจอร์ อุปกรณ์ราคาสูง — จะส่งให้ผู้จัดการอนุมัติก่อน</span>
+              </span>
+            </label>
+          </div>
+
           <!-- หมายเหตุ -->
           <div class="field span2">
             <label>หมายเหตุ / เหตุผลการขอจัดซื้อ</label>
@@ -1024,7 +1049,7 @@ body {
                     <th style="width:38%">ชื่อสินค้า</th>
                     <th style="width:9%">จำนวน</th>
                     <th style="width:11%">หน่วย</th>
-                    <th style="width:12%">ราคาประเมิน/หน่วย (฿)</th>
+                    <th style="width:12%">ราคาประเมิน (ถ้าทราบ)</th>
                     <th style="width:9%">รวม (฿)</th>
                     <th style="width:14%">รายละเอียด</th>
                     <th style="width:7%"></th>
@@ -1185,8 +1210,8 @@ body {
       <input type="text" id="sh-unit" placeholder="ชิ้น / กล่อง / แกลลอน">
     </div>
     <div class="field span2">
-      <label>ราคาประเมิน/หน่วย (฿) — ไม่บังคับ</label>
-      <input type="number" id="sh-price" placeholder="0" min="0" step="0.01" inputmode="decimal">
+      <label>ราคาประเมิน (ถ้าทราบ)</label>
+      <input type="number" id="sh-price" placeholder="ไม่ทราบก็เว้นว่างได้" min="0" step="0.01" inputmode="decimal">
     </div>
     <div class="field span2">
       <label>รูปสินค้า (ถ่ายจากกล้องได้)</label>
@@ -1687,7 +1712,7 @@ function renderMyPRs() {
                 <td><input type="number" value="${it.qty}" min="0" style="width:60px;text-align:center" oninput="myEditField('${prId}',${idx},'qty',this.value);myRerender('${prId}')"></td>
                 <td><input type="text" value="${it.unit}" style="width:60px;text-align:center" oninput="myEditField('${prId}',${idx},'unit',this.value)"></td>
                 <td><input type="number" value="${it.price}" min="0" step="0.01" style="text-align:right" oninput="myEditField('${prId}',${idx},'price',this.value);myRerender('${prId}')"></td>
-                <td style="text-align:right;font-family:var(--mono);font-size:12px;padding:5px 6px">${sub>0?"฿"+sub.toLocaleString("th-TH"):"-"}</td>
+                <td style="text-align:right;font-family:var(--mono);font-size:12px;padding:5px 6px">${itemSubText(it)}</td>
                 <td><button class="del-btn" onclick="myDelItem('${prId}',${idx})" type="button">×</button></td>
               </tr>`;
             }).join("")}
@@ -1698,7 +1723,7 @@ function renderMyPRs() {
         </div>` : ""}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
           <button onclick="myAddItem('${prId}')" style="font-size:13px;color:var(--accent-mid);background:none;border:none;cursor:pointer;font-family:var(--sans);font-weight:500">+ เพิ่มรายการ</button>
-          <span style="font-family:var(--mono);font-weight:500;font-size:14px" id="edit-total-${prId}">รวม ฿${editTotal.toLocaleString("th-TH")}</span>
+          <span style="font-family:var(--mono);font-weight:500;font-size:14px" id="edit-total-${prId}">รวม ${priceInfo(editItems).text}</span>
         </div>
         <button class="save-edit-btn" id="save-btn-${prId}" onclick="saveMyEdit('${prId}')">💾 บันทึกการแก้ไข</button>
         <button class="cancel-edit-btn" onclick="cancelMyEdit('${prId}')">ยกเลิก</button>
@@ -1737,7 +1762,7 @@ function renderMyPRs() {
                 </span>
                 <span style="font-family:var(--mono);white-space:nowrap">${actSub>0
                   ? `<span style="color:#9B7330;font-weight:600">฿${actSub.toLocaleString("th-TH")}</span>`
-                  : (sub>0?"฿"+sub.toLocaleString("th-TH"):"")}</span>
+                  : itemSubText(it)}</span>
               </div>
               ${showChk ? `
               <div id="rdet-${prId}-${idx}" style="display:none;margin:6px 0 4px 25px;padding:8px 10px;background:var(--bg);border-radius:7px">
@@ -1788,7 +1813,7 @@ function renderMyPRs() {
         ${(() => {
           const actualTotal = items.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.actualPrice)||0), 0);
           return `<div style="display:flex;justify-content:flex-end;gap:14px;font-family:var(--mono);font-weight:500;margin-top:8px">
-            <span style="color:var(--text-3);font-weight:400;font-size:12px">ประเมิน ฿${total.toLocaleString("th-TH")}</span>
+            <span style="color:var(--text-3);font-weight:400;font-size:12px">ประเมิน ${priceInfo(items).text}</span>
             ${actualTotal > 0 ? `<span style="color:#9B7330">จริง ฿${actualTotal.toLocaleString("th-TH")}</span>` : ""}
           </div>`;
         })()}
@@ -1884,7 +1909,7 @@ function myRerender(prId) {
   const items    = myEditItems[prId];
   const newTotal = items.reduce((s,i) => s+(parseFloat(i.qty)||0)*(parseFloat(i.price)||0), 0);
   const totalEl  = document.getElementById("edit-total-"+prId);
-  if (totalEl) totalEl.textContent = "รวม ฿" + newTotal.toLocaleString("th-TH");
+  if (totalEl) totalEl.textContent = "รวม " + priceInfo(items).text;
 }
 
 function myAddItem(prId) {
@@ -2210,7 +2235,7 @@ function appendDesktopRow(it) {
     <td><input type="text" placeholder="ชื่อสินค้า" data-f="name" list="item-names" value="${escAttr(it.name)}" oninput="updItem(${id},'name',this.value)" onchange="deskNameChanged(${id}, this)"></td>
     <td><input type="number" placeholder="0" min="1" data-f="qty" style="width:56px" value="${escAttr(it.qty)}" oninput="updItem(${id},'qty',this.value)"></td>
     <td><input type="text" placeholder="ชิ้น/กล่อง" data-f="unit" value="${escAttr(it.unit)}" oninput="updItem(${id},'unit',this.value)"></td>
-    <td><input type="number" placeholder="0" min="0" data-f="price" style="width:76px" value="${escAttr(it.price)}" oninput="updItem(${id},'price',this.value)"></td>
+    <td><input type="number" placeholder="—" min="0" data-f="price" style="width:76px" title="ไม่ทราบก็เว้นว่างได้" value="${escAttr(it.price)}" oninput="updItem(${id},'price',this.value)"></td>
     <td><span id="sub-${id}" style="font-family:var(--mono);font-size:12px;color:var(--text-3)">—</span></td>
     <td style="text-align:center">
       <button class="extra-toggle" id="etbtn-${id}" onclick="toggleExtra(${id})" type="button" title="เพิ่มรูป / คำอธิบาย / ลิงก์">+ ข้อมูล</button>
@@ -2360,18 +2385,12 @@ function delRow(id) {
 function calcRowTotal(id) {
   const it = findItem(id);
   if (!it) return;
-  const sub = (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
   const el = document.getElementById("sub-" + id);
-  if (el) el.textContent = sub > 0
-    ? "฿" + sub.toLocaleString("th-TH", {minimumFractionDigits: 0})
-    : "—";
+  if (el) el.textContent = itemSubText(it);
 }
 
 function calcTotal() {
-  const total = formItems.reduce((s,i) =>
-    s + (parseFloat(i.qty)||0) * (parseFloat(i.price)||0), 0);
-  document.getElementById("grand-total").textContent =
-    "฿" + total.toLocaleString("th-TH", {minimumFractionDigits: 0});
+  document.getElementById("grand-total").textContent = priceInfo(formItems).text;
 }
 
 function getItems() {
@@ -2381,7 +2400,7 @@ function getItems() {
       name:  i.name.trim(),
       qty:   i.qty   || "1",
       unit:  (i.unit  || "-").trim() || "-",
-      price: i.price || "0",
+      price: String(i.price == null ? "" : i.price).trim(),   // ว่าง = ไม่ทราบราคา (ไม่ใช่ 0)
       desc:  (i.desc || "").trim(),
       link:  (i.link || "").trim(),
       img:   i.img   || "",
@@ -2401,7 +2420,7 @@ function renderMobileItems() {
     return;
   }
   box.innerHTML = real.map(it => {
-    const sub = (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
+    const subTxt = itemSubText(it);
     const thumb = it.img
       ? `<img class="m-item-thumb" src="${it.img}" alt="">`
       : `<div class="m-item-thumb-ph">📦</div>`;
@@ -2411,7 +2430,7 @@ function renderMobileItems() {
         <div class="m-item-name">${escAttr(it.name)}</div>
         <div class="m-item-meta">${escAttr(it.qty || "1")} ${escAttr(it.unit || "")}${it.desc ? " · " + escAttr(it.desc) : ""}</div>
       </div>
-      <span class="m-item-sub">${sub > 0 ? "฿" + sub.toLocaleString("th-TH") : ""}</span>
+      <span class="m-item-sub">${subTxt === "—" ? "" : subTxt}</span>
       <div class="m-item-actions">
         <button type="button" onclick="openItemSheet(${it._id})" title="แก้ไข">✏️</button>
         <button type="button" onclick="delRow(${it._id})" title="ลบ">✕</button>
@@ -2573,6 +2592,7 @@ async function submitPR() {
       idToken:     freshIdToken(),
       sessionToken: sessionToken(),
       dept,
+      bigItem:     document.getElementById("f-bigitem").checked,
       lineUserId:  lineProfile.userId,
       displayName: lineProfile.displayName,
       pictureUrl:  lineProfile.pictureUrl,
@@ -2588,7 +2608,7 @@ async function submitPR() {
 
     if (result.success) {
       document.getElementById("toast-prid").textContent =
-        result.prId + " · มูลค่ารวม ฿" + (result.total || 0).toLocaleString("th-TH");
+        result.prId + (result.total ? " · มูลค่ารวม ฿" + result.total.toLocaleString("th-TH") : "");
       showToast("success");
       resetForm();
     } else {
@@ -2608,6 +2628,7 @@ function resetForm() {
   document.getElementById("f-date").value = "";
   document.getElementById("f-note").value = "";
   document.querySelector("input[name='urgency'][value='normal']").checked = true;
+  document.getElementById("f-bigitem").checked = false;
   formItems = [];
   document.getElementById("items-body").innerHTML = "";
   document.getElementById("grand-total").textContent = "฿0";
@@ -2627,6 +2648,65 @@ function showToast(type, msg) {
 function hideToasts() {
   document.getElementById("toast-success").classList.remove("show");
   document.getElementById("toast-error").classList.remove("show");
+}
+
+// ── ยอดรวมที่ซื่อสัตย์กับข้อมูล (คู่กับ priceSummary ใน .gs) ──
+// แยก "ไม่ได้กรอกราคา" (ว่าง → "—") ออกจาก "ของฟรี" (0 → ฿0)
+function priceInfo(items) {
+  let sum = 0, withPrice = 0;
+  const all = items || [];
+  all.forEach(i => {
+    const p = String(i.price == null ? "" : i.price).trim();
+    if (p === "") return;
+    withPrice++;
+    sum += (parseFloat(i.qty) || 0) * (parseFloat(p) || 0);
+  });
+  return {
+    sum, hasAny: withPrice > 0, partial: withPrice > 0 && withPrice < all.length,
+    text: withPrice === 0 ? "—"
+        : "฿" + sum.toLocaleString("th-TH") + (withPrice < all.length ? " (บางส่วน)" : ""),
+  };
+}
+
+// ยอดจากคอลัมน์ K ในชีต — "" หรือค่าว่าง = ไม่มีราคา
+function sheetTotalText(v) {
+  const raw = String(v == null ? "" : v).trim();
+  if (raw === "") return "—";
+  const n = parseFloat(raw);
+  return isNaN(n) ? "—" : "฿" + n.toLocaleString("th-TH");
+}
+
+// ราคาต่อรายการ → ข้อความ ("" = ไม่ทราบ)
+function itemSubText(it) {
+  const p = String(it.price == null ? "" : it.price).trim();
+  if (p === "") return "—";
+  const sub = (parseFloat(it.qty) || 0) * (parseFloat(p) || 0);
+  return "฿" + sub.toLocaleString("th-TH");
+}
+
+// ── toast ลอย ใช้ได้ทุกหน้า (ไม่บล็อกเหมือน alert) ──
+let _flashTimer = null;
+function flashMsg(text, tone) {
+  let el = document.getElementById("flash-msg");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "flash-msg";
+    el.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(12px);" +
+      "z-index:9998;padding:11px 20px;border-radius:24px;font-family:var(--sans);font-size:13.5px;" +
+      "box-shadow:0 4px 20px rgba(0,0,0,0.18);opacity:0;transition:opacity .18s,transform .18s;" +
+      "pointer-events:none;max-width:88vw;text-align:center";
+    document.body.appendChild(el);
+  }
+  const isWarn = tone === "warn";
+  el.style.background = isWarn ? "#FEF3C7" : "#2D4A3E";
+  el.style.color      = isWarn ? "#92400E" : "#FFFFFF";
+  el.style.border     = isWarn ? "1px solid #E8C070" : "none";
+  el.textContent = text;
+  requestAnimationFrame(() => { el.style.opacity = "1"; el.style.transform = "translateX(-50%) translateY(0)"; });
+  clearTimeout(_flashTimer);
+  _flashTimer = setTimeout(() => {
+    el.style.opacity = "0"; el.style.transform = "translateX(-50%) translateY(12px)";
+  }, 2600);
 }
 
 // ── admin auth: LINE userId เท่านั้น (ตัด password ออก 20/7/2026) ──
@@ -2768,7 +2848,7 @@ function renderDeptSummary() {
     <div style="background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--gold-border);border-radius:10px;padding:14px 16px;margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
         <span style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.4px">${heading}</span>
-        <span style="font-family:var(--mono);font-size:15px;font-weight:600;color:#9B7330">฿${grand.toLocaleString("th-TH")}</span>
+        <span style="font-family:var(--mono);font-size:15px;font-weight:600;color:#9B7330">${grand > 0 ? "฿"+grand.toLocaleString("th-TH") : "—"}</span>
       </div>
       ${depts.map(([dept, v]) => `
         <div style="display:flex;align-items:center;gap:10px;padding:3px 0">
@@ -2776,10 +2856,10 @@ function renderDeptSummary() {
           <div style="flex:1;height:14px;background:var(--bg);border-radius:7px;overflow:hidden">
             <div style="width:${Math.max(3, Math.round(v.total / maxVal * 100))}%;height:100%;background:linear-gradient(90deg,var(--accent-mid),var(--gold));border-radius:7px"></div>
           </div>
-          <span style="font-family:var(--mono);font-size:12px;width:90px;text-align:right;flex-shrink:0">฿${v.total.toLocaleString("th-TH")}</span>
+          <span style="font-family:var(--mono);font-size:12px;width:90px;text-align:right;flex-shrink:0">${v.total > 0 ? "฿"+v.total.toLocaleString("th-TH") : "—"}</span>
           <span style="font-size:11px;color:var(--text-3);width:36px;text-align:right;flex-shrink:0">${v.count} ใบ</span>
         </div>`).join("")}
-      <div style="font-size:11px;color:var(--text-3);margin-top:8px">ใช้ราคาจริงเมื่อจัดซื้อกรอกแล้ว · ไม่รวมใบที่ถูกปฏิเสธ</div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:8px">ใช้ราคาจริงเมื่อจัดซื้อกรอกแล้ว · ไม่รวมใบที่ถูกปฏิเสธ<br>⚠️ นับเฉพาะใบที่มีการกรอกราคา — ใบที่ไม่ทราบราคาไม่ถูกรวม</div>
     </div>`;
 }
 
@@ -2903,7 +2983,7 @@ function renderPRs(list) {
 
         <!-- Toggle รายการ -->
         <button class="pr-items-toggle" onclick="toggleExpand('${prId}')">
-          ${isExp ? "▲ ซ่อน" : "▼ ดูรายการ"} (${(isEdit?editedItems:itemsData).length} รายการ · ฿${displayTotal.toLocaleString("th-TH")})${(() => {
+          ${isExp ? "▲ ซ่อน" : "▼ ดูรายการ"} (${(isEdit?editedItems:itemsData).length} รายการ · ${priceInfo(isEdit ? editedItems : itemsData).text})${(() => {
             const sum = itemStatusSummary(itemsData);
             return sum ? ` <span style="color:#9B7330;font-weight:600">· ${sum}</span>` : "";
           })()}
@@ -2997,7 +3077,7 @@ function renderPRs(list) {
           ${(() => {
             const actualTotal = editedItems.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.actualPrice)||0), 0);
             return `<div style="display:flex;justify-content:flex-end;gap:16px;padding:8px 6px 4px;border-top:1px solid var(--border);margin-top:6px;font-family:var(--mono);font-size:13px">
-              <span style="color:var(--text-3)">ประเมิน ฿${editedTotal.toLocaleString("th-TH")}</span>
+              <span style="color:var(--text-3)">ประเมิน ${priceInfo(editedItems).text}</span>
               ${actualTotal > 0 ? `<span style="font-weight:600;color:#9B7330">จริง ฿${actualTotal.toLocaleString("th-TH")}</span>` : ""}
             </div>`;
           })()}
@@ -3021,7 +3101,7 @@ function renderPRs(list) {
                 <span style="font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--text-2);text-align:right">
                   ${actSub > 0
                     ? `<span style="color:#9B7330;font-weight:600">฿${actSub.toLocaleString("th-TH")}</span>${sub > 0 ? `<br><span style="font-size:11px;color:var(--text-3)">ประเมิน ฿${sub.toLocaleString("th-TH")}</span>` : ""}`
-                    : (sub > 0 ? "฿"+sub.toLocaleString("th-TH") : "-")}
+                    : itemSubText(it)}
                 </span>
               </div>`;
             };
@@ -3051,7 +3131,7 @@ function renderPRs(list) {
           ${(() => {
             const actualTotal = itemsData.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.actualPrice)||0), 0);
             return `<div class="pr-total-line" style="gap:16px">
-              <span style="color:var(--text-3);font-weight:400">ประเมิน ฿${total.toLocaleString("th-TH")}</span>
+              <span style="color:var(--text-3);font-weight:400">ประเมิน ${priceInfo(itemsData).text}</span>
               ${actualTotal > 0 ? `<span style="color:#9B7330">จริง ฿${actualTotal.toLocaleString("th-TH")}</span>` : ""}
             </div>`;
           })()}
@@ -3255,7 +3335,7 @@ ${pr["หมายเหตุ"] ? `<div class="note-box">💬 ${pr["หมา�
   <tfoot>
     <tr>
       <td colspan="4" style="text-align:right;padding:10px;border-top:2px solid #1A4A3A">มูลค่ารวมทั้งสิ้น</td>
-      <td style="text-align:right;padding:10px;border-top:2px solid #1A4A3A">฿${total.toLocaleString("th-TH")}</td>
+      <td style="text-align:right;padding:10px;border-top:2px solid #1A4A3A">${priceInfo(items).text}</td>
     </tr>
   </tfoot>
 </table>
@@ -3311,6 +3391,8 @@ async function updateStatus(prId, status) {
     });
     const result = await res.json();
     if (result.success) {
+      // กดสถานะเดิมซ้ำโดยไม่มีข้อมูลใหม่ — บอกเฉยๆ ไม่ใช่ error
+      if (result.noChange) { flashMsg(result.message || "ไม่มีอะไรเปลี่ยนแปลง", "warn"); return; }
       await loadAdmin(true);
     } else {
       if (!handleAuthError(result.error)) alert("เกิดข้อผิดพลาด: " + result.error);
