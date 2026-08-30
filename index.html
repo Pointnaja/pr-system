@@ -560,6 +560,13 @@ body {
   cursor: pointer; color: var(--text-2); white-space: nowrap;
 }
 .btn-step-edit:hover, .btn-step-pdf:hover { background: var(--accent-light); border-color: var(--accent-mid); color: var(--accent); }
+.btn-step-cancel {
+  padding: 7px 12px; border: 1px solid var(--border); background: none;
+  border-radius: 7px; font-family: var(--sans); font-size: 12px;
+  color: var(--text-3); cursor: pointer; white-space: nowrap;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.btn-step-cancel:hover { color: var(--danger); border-color: #FCA5A5; background: var(--danger-bg); }
 
 /* ─── My PR tab ─── */
 .my-pr-card {
@@ -2534,28 +2541,82 @@ function knownVendors() {
       v = v.trim(); if (v) set.add(v);
     });
   });
-  _vendorMemo = { key, list: [...set].sort((a, b) => a.localeCompare(b, "th")) };
+  const seen = new Map();   // ตัวพิมพ์เล็ก → ชื่อที่เจอครั้งแรก (กันขึ้นซ้ำใน dropdown)
+  [...set].forEach(v => { const k = v.toLowerCase(); if (!seen.has(k)) seen.set(k, v); });
+  _vendorMemo = { key, list: [...seen.values()].sort((a, b) => a.localeCompare(b, "th")) };
   return _vendorMemo.list;
 }
 
-function syncVendorDatalist() {
-  let dl = document.getElementById("vendor-list");
-  if (!dl) { dl = document.createElement("datalist"); dl.id = "vendor-list"; document.body.appendChild(dl); }
-  dl.innerHTML = knownVendors().map(v => `<option value="${escAttr(v)}">`).join("");
+// จัดกลุ่มรายการตามร้าน — ร้านที่ยังไม่ระบุไปอยู่ท้ายสุดเสมอ
+// "Makro" กับ "makro" ต้องเป็นร้านเดียวกัน — จับกลุ่มด้วยตัวพิมพ์เล็ก
+// แต่แสดงผลด้วยชื่อที่พิมพ์ครั้งแรก จะได้ไม่เพี้ยนไปจากที่คนพิมพ์
+function groupByVendor(items) {
+  const map = new Map();   // key ตัวพิมพ์เล็ก → { vendor: ชื่อที่เจอครั้งแรก, items: [] }
+  (items || []).forEach(it => {
+    const raw = String(it.vendor || "").trim();
+    const key = raw.toLowerCase();
+    if (!map.has(key)) map.set(key, { vendor: raw, items: [] });
+    map.get(key).items.push(it);
+  });
+  const out = [...map.keys()].filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "th"))
+    .map(k => map.get(k));
+  if (map.has("")) out.push(map.get(""));   // ยังไม่ระบุร้าน ไปท้ายสุดเสมอ
+  return out;
 }
 
-// จัดกลุ่มรายการตามร้าน — ร้านที่ยังไม่ระบุไปอยู่ท้ายสุดเสมอ
-function groupByVendor(items) {
-  const map = new Map();
-  (items || []).forEach(it => {
-    const v = String(it.vendor || "").trim();
-    if (!map.has(v)) map.set(v, []);
-    map.get(v).push(it);
-  });
-  const named = [...map.keys()].filter(Boolean).sort((a, b) => a.localeCompare(b, "th"));
-  const out = named.map(v => ({ vendor: v, items: map.get(v) }));
-  if (map.has("")) out.push({ vendor: "", items: map.get("") });
-  return out;
+// ── เลือกหลายรายการ → ใส่ร้านทีเดียว ─────────────────────────
+// ใบจริงมี 30+ รายการ ถ้าพิมพ์ชื่อร้านทีละชิ้นไม่มีใครทำ
+// (ดูจาก "รอบ" ที่ต้องเลือกทีละชิ้นเหมือนกัน — มีคนใช้แค่ 11%)
+let picked = {};   // prId → Set ของ index ที่ติ๊กไว้
+
+function pickItem(prId, idx, on) {
+  if (!picked[prId]) picked[prId] = new Set();
+  on ? picked[prId].add(idx) : picked[prId].delete(idx);
+  renderPickBar(prId);
+}
+
+function pickAll(prId, on) {
+  const n = (editedData[prId] || []).length;
+  picked[prId] = new Set(on ? Array.from({ length: n }, (_, i) => i) : []);
+  applyFilter();
+}
+
+function renderPickBar(prId) {
+  const bar = document.getElementById("pickbar-" + prId);
+  if (!bar) return;
+  const n = picked[prId] ? picked[prId].size : 0;
+  bar.style.visibility = n ? "visible" : "hidden";
+  const lbl = document.getElementById("pickcount-" + prId);
+  if (lbl) lbl.textContent = n;
+}
+
+function applyVendorToPicked(prId) {
+  const box = document.getElementById("bulkvendor-" + prId);
+  const v   = (box?.value || "").trim();
+  const sel = picked[prId];
+  if (!sel || !sel.size) return;
+  if (!v) { flashMsg("พิมพ์ชื่อร้านก่อนครับ", "warn"); box?.focus(); return; }
+  sel.forEach(i => { if (editedData[prId][i]) editedData[prId][i].vendor = v; });
+  const n = sel.size;
+  picked[prId] = new Set();
+  if (box) box.value = "";
+  applyFilter();
+  flashMsg("ใส่ร้าน \"" + v + "\" ให้ " + n + " รายการแล้ว", "ok");
+}
+
+// ยกเลิกการแก้ไข — ทิ้งของที่แก้ค้างไว้ ไม่แตะข้อมูลบนชีต
+function cancelEdit(prId) {
+  const orig = allPRs.find(r => r["PR ID"] === prId);
+  let before = "[]";
+  try { before = JSON.stringify(JSON.parse(orig?.["รายการ JSON"] || "[]")); } catch (e) {}
+  const changed = JSON.stringify(editedData[prId] || []) !== before;
+  if (changed && !confirm("ยกเลิกการแก้ไข?\nสิ่งที่แก้ไว้จะหายทั้งหมด")) return;
+  delete editedData[prId];
+  delete picked[prId];
+  editMode[prId] = false;
+  applyFilter();
+  flashMsg("ยกเลิกการแก้ไขแล้ว — ข้อมูลเดิมไม่ถูกแตะ", "warn");
 }
 
 // ── Edit mode helpers ─────────────────────────────────────────
@@ -2584,8 +2645,9 @@ function toggleEditMode(prId) {
     }
     editedData[prId] = items;
     editMode[prId]   = true;
+    picked[prId]     = new Set();
     expanded[prId]   = true; // auto-expand
-    syncVendorDatalist();
+    updateVendorSuggestions();
   }
   applyFilter();
 }
@@ -2804,12 +2866,7 @@ function updateStats() {
 function updateVendorSuggestions() {
   const dl = document.getElementById("vendor-names");
   if (!dl) return;
-  const names = new Set();
-  allPRs.forEach(pr => {
-    const v = (pr["ร้านค้า/แหล่งซื้อ"] || "").trim();
-    if (v) names.add(v);
-  });
-  dl.innerHTML = [...names].sort().map(n => `<option value="${escAttr(n)}">`).join("");
+  dl.innerHTML = knownVendors().map(n => `<option value="${escAttr(n)}">`).join("");
 }
 
 // ── สรุปยอดรายแผนก เดือนนี้ ──────────────────────────────────
@@ -3037,11 +3094,29 @@ function renderPRs(list) {
         <div class="pr-items-body">
           ${isEdit ? `
           <!-- Edit Mode -->
-          <div style="font-size:11px;color:var(--text-3);font-weight:500;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px">✏️ แก้ไขรายการ</div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+            <span style="font-size:11px;color:var(--text-3);font-weight:500;text-transform:uppercase;letter-spacing:0.4px">✏️ แก้ไขรายการ</span>
+            <span style="font-size:11px;color:var(--text-3)">— ติ๊กหลายรายการแล้วใส่ร้านทีเดียวได้</span>
+          </div>
+          <div id="pickbar-${prId}" style="visibility:${(picked[prId]&&picked[prId].size)?'visible':'hidden'};display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding:8px 10px;background:var(--gold-light);border:1px solid var(--gold-border);border-radius:8px">
+            <span style="font-size:12px;font-weight:600;color:#9B7330;white-space:nowrap">เลือกไว้ <span id="pickcount-${prId}">${(picked[prId]&&picked[prId].size)||0}</span> รายการ</span>
+            <input type="text" id="bulkvendor-${prId}" list="vendor-names" placeholder="ใส่ชื่อร้านให้ทั้งหมด..." autocomplete="off"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();applyVendorToPicked('${prId}')}"
+              style="flex:1;min-width:140px;padding:6px 8px;border:1px solid var(--gold-border);border-radius:6px;font-family:var(--sans);font-size:12px;background:var(--surface)">
+            <button onclick="applyVendorToPicked('${prId}')"
+              style="padding:6px 12px;background:var(--gold);color:#fff;border:none;border-radius:6px;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">🏪 ใส่ร้าน</button>
+            <button onclick="pickAll('${prId}',false)"
+              style="padding:6px 10px;background:none;color:var(--text-2);border:1px solid var(--border);border-radius:6px;font-family:var(--sans);font-size:12px;cursor:pointer;white-space:nowrap">ล้าง</button>
+          </div>
           <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
           <table style="width:100%;min-width:660px;border-collapse:collapse;font-size:13px">
             <thead>
               <tr>
+                <th style="text-align:center;padding:4px 2px;border-bottom:1px solid var(--border);width:26px">
+                  <input type="checkbox" title="เลือกทั้งหมด" style="cursor:pointer"
+                    ${(picked[prId]&&picked[prId].size===editedItems.length&&editedItems.length)?"checked":""}
+                    onchange="pickAll('${prId}',this.checked)">
+                </th>
                 <th style="text-align:left;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);min-width:120px">สินค้า</th>
                 <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:52px">จำนวน</th>
                 <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:52px">หน่วย</th>
@@ -3054,7 +3129,12 @@ function renderPRs(list) {
             </thead>
             <tbody>
               ${editedItems.map((it, idx) => {
-                return `<tr>
+                const isPicked = !!(picked[prId] && picked[prId].has(idx));
+                return `<tr${isPicked ? ' style="background:var(--gold-light)"' : ''}>
+                  <td style="padding:5px 2px;text-align:center">
+                    <input type="checkbox" style="cursor:pointer" ${isPicked ? "checked" : ""}
+                      onchange="pickItem('${prId}',${idx},this.checked)">
+                  </td>
                   <td style="padding:5px 6px">
                     <div style="font-weight:500">${it.name}</div>
                     ${it.desc ? `<div style="font-size:11px;color:var(--text-3)">${it.desc}</div>` : ""}
@@ -3096,7 +3176,7 @@ function renderPRs(list) {
                     </select>
                   </td>
                   <td style="padding:5px 4px">
-                    <input type="text" list="vendor-list" value="${escAttr(it.vendor || '')}" placeholder="ร้าน..."
+                    <input type="text" list="vendor-names" value="${escAttr(it.vendor || '')}" placeholder="ร้าน..."
                       style="width:100%;min-width:88px;border:1px solid var(--gold-border);background:var(--gold-light);border-radius:4px;padding:4px 6px;font-size:12px;font-family:var(--sans)"
                       oninput="updateEditItem('${prId}',${idx},'vendor',this.value)" onchange="applyFilter()">
                   </td>
@@ -3143,7 +3223,7 @@ function renderPRs(list) {
                 <div style="display:flex;gap:10px;align-items:flex-start">
                   ${(it.img && (it.img.startsWith('data:') || it.img.startsWith('http'))) ? `<img src="${it.img}" class="admin-item-img" alt="${it.name}" data-fullsrc="${it.img.replace(/"/g,'&quot;')}" onclick="viewImg(this.getAttribute('data-fullsrc'))" title="คลิกเพื่อขยายรูป">` : ""}
                   <div>
-                    <div style="font-weight:500;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">${it.name} ${itemStatusChip(it.itemStatus)}${receiveChip(it)}${it.vendor ? `<span style="font-size:11px;font-weight:500;color:#9B7330;background:var(--gold-light);border:1px solid var(--gold-border);border-radius:20px;padding:1px 8px">🏪 ${it.vendor}</span>` : ""}</div>
+                    <div style="font-weight:500;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">${it.name} ${itemStatusChip(it.itemStatus)}${receiveChip(it)}</div>
                     ${it.shortNote ? `<div style="font-size:11px;color:var(--text-3);font-style:italic">📝 ${it.shortNote}</div>` : ""}
                     <div style="font-size:12px;color:var(--text-3)">${it.qty} ${it.unit}</div>
                     ${it.desc ? `<div style="font-size:12px;color:var(--text-2);margin-top:2px">${it.desc}</div>` : ""}
@@ -3157,6 +3237,19 @@ function renderPRs(list) {
                 </span>
               </div>`;
             };
+            // มีร้านแล้ว = จัดกลุ่มตามร้าน (ร้านคือสิ่งที่จัดซื้อใช้จริง)
+            // ยังไม่มีร้าน = ตกไปใช้ "รอบ" แบบเดิม ใบเก่าจะได้ไม่เปลี่ยนหน้าตา
+            if (itemsData.some(i => String(i.vendor || "").trim())) {
+              return groupByVendor(itemsData).map(g => {
+                const gSum = g.items.reduce((t, i) =>
+                  t + (parseFloat(i.qty)||0) * (parseFloat(i.actualPrice) || parseFloat(i.price) || 0), 0);
+                return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;padding:6px 10px;background:var(--gold-light);border-radius:6px;font-size:12px">
+                  <span style="font-weight:600;color:#9B7330">🏪 ${g.vendor || "ยังไม่ระบุร้าน"}</span>
+                  <span style="color:var(--text-3)">${g.items.length} รายการ</span>
+                  ${gSum > 0 ? `<span style="margin-left:auto;font-family:var(--mono);color:var(--text-2)">฿${gSum.toLocaleString("th-TH")}</span>` : ""}
+                </div>` + g.items.map(line).join("");
+              }).join("");
+            }
             const lots = [...new Set(itemsData.map(i => i.lot).filter(Boolean))].sort();
             if (!lots.length) return itemsData.map(line).join("");
             const lotHeader = (lot) => {
@@ -3215,6 +3308,7 @@ function renderPRs(list) {
               </div>
               <div style="display:flex;gap:6px;margin-top:8px">
                 <button class="btn-step-edit" onclick="toggleEditMode('${prId}')">${isEdit ? '✓ บันทึก' : '✏️ แก้ไขรายการ'}</button>
+                ${isEdit ? `<button class="btn-step-cancel" onclick="cancelEdit('${prId}')">✕ ยกเลิก</button>` : ''}
                 <button class="btn-step-pdf" onclick="printPR('${prId}')">📄 PDF</button>
               </div>
             </div>`;
@@ -3240,12 +3334,6 @@ function renderPRs(list) {
             ? `<div class="step-action-area">
                 <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ...">
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                  <label style="font-size:11px;color:var(--text-3);white-space:nowrap">🏪 ร้านค้า:</label>
-                  <input type="text" id="vendor-${prId}" list="vendor-names"
-                    value="${escAttr(pr['ร้านค้า/แหล่งซื้อ'] || '')}" placeholder="ร้านที่ซื้อ..." autocomplete="off"
-                    style="width:150px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:var(--sans);font-size:12px;background:var(--bg);color:var(--text)">
-                </div>
-                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                   <label style="font-size:11px;color:var(--text-3);white-space:nowrap">📦 คาดว่าของถึง:</label>
                   <input type="date" id="eta-${prId}" value="${pr['วันที่คาดว่าของจะถึง']||''}"
                     style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:var(--sans);font-size:12px;background:var(--bg);color:var(--text)">
@@ -3255,7 +3343,8 @@ function renderPRs(list) {
               </div>`
             : '';
 
-          const editBtn = `<button class="btn-step-edit" onclick="toggleEditMode('${prId}')">${isEdit ? '✓ บันทึก' : '✏️ แก้ไขรายการ'}</button>`;
+          const editBtn = `<button class="btn-step-edit" onclick="toggleEditMode('${prId}')">${isEdit ? '✓ บันทึก' : '✏️ แก้ไขรายการ'}</button>`
+            + (isEdit ? `<button class="btn-step-cancel" onclick="cancelEdit('${prId}')">✕ ยกเลิก</button>` : '');
           const pdfBtn  = `<button class="btn-step-pdf" onclick="printPR('${prId}')">📄 PDF</button>`;
 
           return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
@@ -3457,7 +3546,6 @@ async function updateStatus(prId, status) {
     }
     comment = reason.trim();
   }
-  const vendor = document.getElementById("vendor-" + prId)?.value.trim() || "";
   const payload = {
     action: "updateStatus",
     idToken: freshIdToken(),
@@ -3466,7 +3554,6 @@ async function updateStatus(prId, status) {
     status,
     comment,
     estimatedArrival,
-    vendor,
     updatedBy: adminName || "Admin",
     adminUserId: lineProfile.userId || ""
   };
