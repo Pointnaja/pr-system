@@ -1820,8 +1820,9 @@ function renderMyPRs() {
         ${(() => {
           const actualTotal = items.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.actualPrice)||0), 0);
           return `<div style="display:flex;justify-content:flex-end;gap:14px;font-family:var(--mono);font-weight:500;margin-top:8px">
-            <span style="color:var(--text-3);font-weight:400;font-size:12px">ประเมิน ${priceInfo(items).text}</span>
-            ${actualTotal > 0 ? `<span style="color:#9B7330">จริง ฿${actualTotal.toLocaleString("th-TH")}</span>` : ""}
+            ${actualTotal > 0
+              ? `<span style="color:#9B7330">รวม ฿${actualTotal.toLocaleString("th-TH")}</span>`
+              : `<span style="color:var(--text-3);font-weight:400;font-size:12px">${items.length} รายการ</span>`}
           </div>`;
         })()}
       </div>
@@ -2565,6 +2566,58 @@ function groupByVendor(items) {
   return out;
 }
 
+// ── สรุปยอดแยกร้าน ───────────────────────────────────────────
+// แยก "ประเมิน" กับ "จริง" ออกจากกันเสมอ — เอามาบวกรวมกันไม่ได้
+// เพราะประเมินคือตัวเลขที่ผู้ขอเดา ส่วนจริงคือเงินที่จ่ายไปแล้ว
+function vendorTotals(items) {
+  const rows = groupByVendor(items).map(g => {
+    let est = 0, act = 0, priced = 0;
+    g.items.forEach(i => {
+      const q = parseFloat(i.qty) || 0;
+      const p = String(i.price === undefined || i.price === null ? "" : i.price).trim();
+      if (p !== "") { est += q * (parseFloat(p) || 0); priced++; }
+      act += q * (parseFloat(i.actualPrice) || 0);
+    });
+    return { vendor: g.vendor, count: g.items.length, est, act,
+             estPartial: priced > 0 && priced < g.items.length, estAny: priced > 0 };
+  });
+  return {
+    rows,
+    est: rows.reduce((t, r) => t + r.est, 0),
+    act: rows.reduce((t, r) => t + r.act, 0),
+    hasVendor: rows.some(r => r.vendor),
+  };
+}
+
+function baht(v) { return "฿" + (v || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 }); }
+
+// ตารางสรุปยอดต่อร้าน — ใช้ทั้งโหมดแก้ไขและโหมดดู
+function vendorSummaryHTML(items) {
+  const t = vendorTotals(items);
+  if (!t.hasVendor) return "";      // ยังไม่ใส่ร้านเลย = ไม่ต้องมีตารางให้รก
+  const cell = "padding:5px 8px;border-bottom:1px solid var(--border)";
+  return `<div style="margin-top:12px;border:1px solid var(--gold-border);border-radius:8px;overflow:hidden">
+    <div style="padding:7px 10px;background:var(--gold-light);font-size:11px;font-weight:600;color:#9B7330;text-transform:uppercase;letter-spacing:0.4px">💰 สรุปยอดแยกร้าน</div>
+    <div style="overflow-x:auto"><table style="width:100%;min-width:280px;border-collapse:collapse;font-size:12px">
+      <thead><tr>
+        <th style="${cell};text-align:left;font-weight:500;color:var(--text-3);font-size:11px">ร้าน</th>
+        <th style="${cell};text-align:center;font-weight:500;color:var(--text-3);font-size:11px;width:64px">รายการ</th>
+        <th style="${cell};text-align:right;font-weight:600;color:#9B7330;font-size:11px;width:92px">จ่ายจริง</th>
+      </tr></thead>
+      <tbody>${t.rows.map(r => `<tr>
+        <td style="${cell};font-weight:500">${r.vendor ? "🏪 " + r.vendor : `<span style="color:var(--text-3)">ยังไม่ระบุร้าน</span>`}</td>
+        <td style="${cell};text-align:center;color:var(--text-2)">${r.count}</td>
+        <td style="${cell};text-align:right;font-family:var(--mono);font-weight:600;color:${r.act > 0 ? "#9B7330" : "var(--text-3)"}">${r.act > 0 ? baht(r.act) : "—"}</td>
+      </tr>`).join("")}</tbody>
+      <tfoot><tr style="background:var(--bg)">
+        <td style="padding:7px 8px;font-weight:600" colspan="2">รวมทุกร้าน</td>
+        <td style="padding:7px 8px;text-align:right;font-family:var(--mono);font-weight:700;color:#9B7330">${t.act > 0 ? baht(t.act) : "—"}</td>
+      </tr></tfoot>
+    </table></div>
+    ${t.act === 0 ? `<div style="padding:5px 10px;font-size:11px;color:var(--text-3);font-style:italic">ยังไม่ได้กรอกราคาจริง — ยอดจึงยังว่าง</div>` : ""}
+  </div>`;
+}
+
 // ── เลือกหลายรายการ → ใส่ร้านทีเดียว ─────────────────────────
 // ใบจริงมี 30+ รายการ ถ้าพิมพ์ชื่อร้านทีละชิ้นไม่มีใครทำ
 // (ดูจาก "รอบ" ที่ต้องเลือกทีละชิ้นเหมือนกัน — มีคนใช้แค่ 11%)
@@ -2783,11 +2836,23 @@ function sheetTotalText(v) {
 }
 
 // ราคาต่อรายการ → ข้อความ ("" = ไม่ทราบ)
+// ราคาประเมินมีคนกรอกแค่ 1% (20 จาก 1,764 รายการ) เลยไม่ให้คอลัมน์แล้ว
+// แต่ใบที่กรอกมาจริงต้องไม่หาย — แสดงเป็นตัวเล็กใต้ชื่อของแทน
+function estNote(it) {
+  const p = String(it.price == null ? "" : it.price).trim();
+  if (p === "" || !(parseFloat(p) > 0)) return "";
+  const sub = (parseFloat(it.qty) || 0) * parseFloat(p);
+  return `<div style="font-size:11px;color:var(--text-3)">ผู้ขอประเมิน ฿${sub.toLocaleString("th-TH")}</div>`;
+}
+
+// ยังไม่มีราคาจริง — มีแต่ที่ผู้ขอประเมินมา ต้องบอกให้ชัดว่าเป็นแค่ประเมิน
+// ใบเก่าเก็บราคาเป็น "0" เยอะมาก (98%) ซึ่งแปลว่า "ไม่รู้ราคา" ไม่ใช่ "ของฟรี"
+// เลยต้องแสดงเป็น — ไม่ใช่ ฿0
 function itemSubText(it) {
   const p = String(it.price == null ? "" : it.price).trim();
-  if (p === "") return "—";
-  const sub = (parseFloat(it.qty) || 0) * (parseFloat(p) || 0);
-  return "฿" + sub.toLocaleString("th-TH");
+  if (p === "" || !(parseFloat(p) > 0)) return "—";
+  const sub = (parseFloat(it.qty) || 0) * parseFloat(p);
+  return `<span style="color:var(--text-3)">ประเมิน ฿${sub.toLocaleString("th-TH")}</span>`;
 }
 
 // ── toast ลอย ใช้ได้ทุกหน้า (ไม่บล็อกเหมือน alert) ──
@@ -3084,7 +3149,10 @@ function renderPRs(list) {
 
         <!-- Toggle รายการ -->
         <button class="pr-items-toggle" onclick="toggleExpand('${prId}')">
-          ${isExp ? "▲ ซ่อน" : "▼ ดูรายการ"} (${(isEdit?editedItems:itemsData).length} รายการ · ${priceInfo(isEdit ? editedItems : itemsData).text})${(() => {
+          ${isExp ? "▲ ซ่อน" : "▼ ดูรายการ"} (${(isEdit?editedItems:itemsData).length} รายการ${(() => {
+            const a = vendorTotals(isEdit ? editedItems : itemsData).act;
+            return a > 0 ? " · " + baht(a) : "";
+          })()})${(() => {
             const sum = itemStatusSummary(itemsData);
             return sum ? ` <span style="color:#9B7330;font-weight:600">· ${sum}</span>` : "";
           })()}
@@ -3120,7 +3188,6 @@ function renderPRs(list) {
                 <th style="text-align:left;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);min-width:120px">สินค้า</th>
                 <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:52px">จำนวน</th>
                 <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:52px">หน่วย</th>
-                <th style="text-align:right;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:70px">ประเมิน</th>
                 <th style="text-align:right;padding:4px 6px;color:#9B7330;font-weight:600;font-size:11px;border-bottom:1px solid var(--border);width:70px">ราคาจริง</th>
                 <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:92px">สถานะ</th>
                 <th style="text-align:center;padding:4px 6px;color:var(--text-3);font-weight:500;font-size:11px;border-bottom:1px solid var(--border);width:56px">รอบ</th>
@@ -3138,6 +3205,7 @@ function renderPRs(list) {
                   <td style="padding:5px 6px">
                     <div style="font-weight:500">${it.name}</div>
                     ${it.desc ? `<div style="font-size:11px;color:var(--text-3)">${it.desc}</div>` : ""}
+                    ${estNote(it)}
                   </td>
                   <td style="padding:5px 4px">
                     <input type="number" value="${it.qty}" min="0" step="1" inputmode="decimal"
@@ -3148,11 +3216,6 @@ function renderPRs(list) {
                     <input type="text" value="${it.unit}"
                       style="width:100%;min-width:44px;text-align:center;border:1px solid var(--border);border-radius:4px;padding:4px;font-size:12px"
                       oninput="updateEditItem('${prId}',${idx},'unit',this.value)" onchange="applyFilter()">
-                  </td>
-                  <td style="padding:5px 4px">
-                    <input type="number" value="${it.price}" min="0" step="0.01" inputmode="decimal"
-                      style="width:100%;min-width:64px;text-align:right;border:1px solid var(--border);border-radius:4px;padding:4px;font-size:12px"
-                      oninput="updateEditItem('${prId}',${idx},'price',this.value)" onchange="applyFilter()">
                   </td>
                   <td style="padding:5px 4px">
                     <input type="number" value="${it.actualPrice || ''}" min="0" step="0.01" placeholder="—" inputmode="decimal"
@@ -3209,9 +3272,10 @@ function renderPRs(list) {
           ${(() => {
             const actualTotal = editedItems.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.actualPrice)||0), 0);
             return `<div style="display:flex;justify-content:flex-end;gap:16px;padding:8px 6px 4px;border-top:1px solid var(--border);margin-top:6px;font-family:var(--mono);font-size:13px">
-              <span style="color:var(--text-3)">ประเมิน ${priceInfo(editedItems).text}</span>
-              ${actualTotal > 0 ? `<span style="font-weight:600;color:#9B7330">จริง ฿${actualTotal.toLocaleString("th-TH")}</span>` : ""}
-            </div>`;
+              ${actualTotal > 0
+                ? `<span style="font-weight:600;color:#9B7330">รวมจ่ายจริง ฿${actualTotal.toLocaleString("th-TH")}</span>`
+                : `<span style="color:var(--text-3)">ยังไม่ได้กรอกราคาจริง</span>`}
+            </div>` + vendorSummaryHTML(editedItems);
           })()}
           ` : `
           <!-- View Mode -->
@@ -3240,15 +3304,15 @@ function renderPRs(list) {
             // มีร้านแล้ว = จัดกลุ่มตามร้าน (ร้านคือสิ่งที่จัดซื้อใช้จริง)
             // ยังไม่มีร้าน = ตกไปใช้ "รอบ" แบบเดิม ใบเก่าจะได้ไม่เปลี่ยนหน้าตา
             if (itemsData.some(i => String(i.vendor || "").trim())) {
-              return groupByVendor(itemsData).map(g => {
-                const gSum = g.items.reduce((t, i) =>
-                  t + (parseFloat(i.qty)||0) * (parseFloat(i.actualPrice) || parseFloat(i.price) || 0), 0);
+              const vt = vendorTotals(itemsData);
+              return groupByVendor(itemsData).map((g, gi) => {
+                const r = vt.rows[gi];
                 return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;padding:6px 10px;background:var(--gold-light);border-radius:6px;font-size:12px">
                   <span style="font-weight:600;color:#9B7330">🏪 ${g.vendor || "ยังไม่ระบุร้าน"}</span>
                   <span style="color:var(--text-3)">${g.items.length} รายการ</span>
-                  ${gSum > 0 ? `<span style="margin-left:auto;font-family:var(--mono);color:var(--text-2)">฿${gSum.toLocaleString("th-TH")}</span>` : ""}
+                  ${r.act > 0 ? `<span style="margin-left:auto;font-family:var(--mono);font-weight:600;color:#9B7330">${baht(r.act)}</span>` : ""}
                 </div>` + g.items.map(line).join("");
-              }).join("");
+              }).join("") + vendorSummaryHTML(itemsData);
             }
             const lots = [...new Set(itemsData.map(i => i.lot).filter(Boolean))].sort();
             if (!lots.length) return itemsData.map(line).join("");
@@ -3276,8 +3340,9 @@ function renderPRs(list) {
           ${(() => {
             const actualTotal = itemsData.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.actualPrice)||0), 0);
             return `<div class="pr-total-line" style="gap:16px">
-              <span style="color:var(--text-3);font-weight:400">ประเมิน ${priceInfo(itemsData).text}</span>
-              ${actualTotal > 0 ? `<span style="color:#9B7330">จริง ฿${actualTotal.toLocaleString("th-TH")}</span>` : ""}
+              ${actualTotal > 0
+                ? `<span style="color:#9B7330">รวมจ่ายจริง ฿${actualTotal.toLocaleString("th-TH")}</span>`
+                : `<span style="color:var(--text-3);font-weight:400">ยังไม่ได้กรอกราคาจริง</span>`}
             </div>`;
           })()}
           `}
@@ -3409,10 +3474,9 @@ function printPR(prId) {
     const unitP = act > 0 ? act : est;
     const sub   = qty * unitP;
     return `<tr>
-      <td style="${cell}">${it.name}${it.desc ? `<br><span style="font-size:11px;color:#888">${it.desc}</span>` : ""}${it.link ? `<br><a href="${it.link}" style="font-size:11px;color:#0077B6">${it.link}</a>` : ""}</td>
+      <td style="${cell}">${it.name}${it.desc ? `<br><span style="font-size:11px;color:#888">${it.desc}</span>` : ""}${est > 0 ? `<br><span style="font-size:11px;color:#aaa">ผู้ขอประเมิน ${money(qty * est)}</span>` : ""}${it.link ? `<br><a href="${it.link}" style="font-size:11px;color:#0077B6">${it.link}</a>` : ""}</td>
       <td style="${cell};text-align:center">${it.qty}</td>
       <td style="${cell};text-align:center">${it.unit}</td>
-      <td style="${cell};text-align:right;color:#999">${est > 0 ? money(est) : "—"}</td>
       <td style="${cell};text-align:right;font-weight:600;color:#9B7330">${act > 0 ? money(act) : "—"}</td>
       <td style="${cell};text-align:right;font-weight:600${act > 0 ? "" : ";color:#999;font-weight:400"}">${sub > 0 ? (act > 0 ? "" : "~") + money(sub) : "—"}</td>
     </tr>`;
@@ -3421,13 +3485,14 @@ function printPR(prId) {
   const groups   = groupByVendor(items);
   const multiple = groups.length > 1;
 
-  const rows = groups.map(g => {
-    const gSum = g.items.reduce((t, i) =>
-      t + (parseFloat(i.qty) || 0) * (parseFloat(i.actualPrice) || parseFloat(i.price) || 0), 0);
+  const vt = vendorTotals(items);
+  const rows = groups.map((g, gi) => {
+    const r = vt.rows[gi];
+    const gSum = r.act > 0 ? r.act : r.est;
     // ไม่แยกร้าน (ร้านเดียว/ยังไม่ได้จัดกลุ่ม) = ไม่ต้องมีหัวข้อคั่นให้รก
     const head = !multiple && !g.vendor ? "" : `<tr class="vendor-head">
-      <td colspan="5">🏪 ${g.vendor || "ยังไม่ระบุร้าน"} <span style="font-weight:400;color:#888;font-size:11px">· ${g.items.length} รายการ</span></td>
-      <td style="text-align:right">${gSum > 0 ? money(gSum) : "—"}</td>
+      <td colspan="4">🏪 ${g.vendor || "ยังไม่ระบุร้าน"} <span style="font-weight:400;color:#888;font-size:11px">· ${g.items.length} รายการ</span></td>
+      <td style="text-align:right">${gSum > 0 ? (r.act > 0 ? "" : "~") + money(gSum) : "—"}</td>
     </tr>`;
     return head + g.items.map(itemRow).join("");
   }).join("");
@@ -3463,6 +3528,13 @@ function printPR(prId) {
   .vendor-head td { background: #FBF7EF; border-top: 2px solid #C9A961; border-bottom: 1px solid #E5D5B0; padding: 8px 10px; font-size: 13px; font-weight: 700; color: #7A5C1E; }
   .vendor-head { page-break-after: avoid; }
   .est-note { margin-top: 8px; font-size: 11px; color: #999; font-style: italic; }
+  .vsum { margin-top: 22px; border: 1px solid #E5D5B0; border-radius: 8px; overflow: hidden; page-break-inside: avoid; }
+  .vsum-title { background: #FBF7EF; padding: 8px 12px; font-size: 12px; font-weight: 700; color: #7A5C1E; }
+  .vsum-table { font-size: 12px; }
+  .vsum-table th { background: #fff; color: #888; font-weight: 500; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid #eee; text-align: left; }
+  .vsum-table th:not(:first-child) { text-align: right; }
+  .vsum-table td { padding: 6px 12px; border-bottom: 1px solid #f2f2f2; }
+  .vsum-table tfoot td { background: #FBF7EF; font-weight: 700; color: #1A4A3A; border-bottom: none; }
   .urg-banner { margin-top: 16px; padding: 8px 12px; border-radius: 7px; font-size: 13px; font-weight: 600; color: ${urgColor}; background: ${urgColor}18; }
   .comment-box { margin-top: 16px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; }
   .footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; font-size: 11px; color: #aaa; }
@@ -3498,7 +3570,6 @@ ${pr["หมายเหตุ"] ? `<div class="note-box">💬 ${pr["หมา�
       <th>สินค้า</th>
       <th style="width:56px">จำนวน</th>
       <th style="width:52px">หน่วย</th>
-      <th style="width:86px">ประเมิน</th>
       <th style="width:86px">ราคาจริง</th>
       <th style="width:96px">รวม</th>
     </tr>
@@ -3506,16 +3577,33 @@ ${pr["หมายเหตุ"] ? `<div class="note-box">💬 ${pr["หมา�
   <tbody>${rows}</tbody>
   <tfoot>
     <tr>
-      <td colspan="5" style="text-align:right;padding:10px;border-top:2px solid #1A4A3A">มูลค่ารวมทั้งสิ้น</td>
+      <td colspan="4" style="text-align:right;padding:10px;border-top:2px solid #1A4A3A">มูลค่ารวมทั้งสิ้น</td>
       <td style="text-align:right;padding:10px;border-top:2px solid #1A4A3A">${actTotal > 0 ? money(actTotal) : (estTotal > 0 ? "~" + money(estTotal) : "—")}</td>
     </tr>
     ${actTotal > 0 && estTotal > 0 ? `<tr>
-      <td colspan="5" style="text-align:right;padding:0 10px 10px;font-size:12px;font-weight:400;color:#888">ยอดประเมินตอนแจ้ง</td>
+      <td colspan="4" style="text-align:right;padding:0 10px 10px;font-size:12px;font-weight:400;color:#888">ยอดประเมินตอนแจ้ง</td>
       <td style="text-align:right;padding:0 10px 10px;font-size:12px;font-weight:400;color:#888">${money(estTotal)}</td>
     </tr>` : ""}
   </tfoot>
 </table>
 ${actTotal === 0 && estTotal > 0 ? `<div class="est-note">~ = ยังเป็นราคาประเมิน จัดซื้อยังไม่ได้กรอกราคาจริง</div>` : ""}
+
+${vt.hasVendor ? `<div class="vsum">
+  <div class="vsum-title">💰 สรุปยอดแยกร้าน</div>
+  <table class="vsum-table">
+    <thead><tr><th>ร้าน</th><th style="width:70px">รายการ</th><th style="width:120px">จ่ายจริง</th></tr></thead>
+    <tbody>${vt.rows.map(r => `<tr>
+      <td>${r.vendor ? "🏪 " + r.vendor : "ยังไม่ระบุร้าน"}</td>
+      <td style="text-align:center">${r.count}</td>
+      <td style="text-align:right;font-weight:600;color:#7A5C1E">${r.act > 0 ? money(r.act) : "—"}</td>
+    </tr>`).join("")}</tbody>
+    <tfoot><tr>
+      <td colspan="2">รวมทุกร้าน</td>
+      <td style="text-align:right">${vt.act > 0 ? money(vt.act) : "—"}</td>
+    </tr></tfoot>
+  </table>
+  ${vt.act === 0 ? `<div class="est-note">ยังไม่ได้กรอกราคาจริง — ยอดจึงยังว่าง</div>` : ""}
+</div>` : ""}
 
 ${urgRaw && !urgRaw.includes("ปกติ") ? `<div class="urg-banner">${urgRaw} — กรุณาดำเนินการตามความเร่งด่วน</div>` : ""}
 ${pr["comment"] ? `<div class="comment-box"><strong>หมายเหตุ Admin:</strong> ${pr["comment"]}</div>` : ""}
