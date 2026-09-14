@@ -2953,6 +2953,24 @@ function loadErrorHTML(err, retryFn) {
 
 let _adminLoadedAt = 0;
 let _adminLoading  = null;   // กันกดรีเฟรชรัว ๆ แล้วยิงซ้อนกันหลายคำขอ
+
+// โหลดแบบ 2 ขั้น: ปกติขอแค่ใบที่ยังไม่ปิด + ใบเดือนนี้ + 150 ใบล่าสุด
+// ใบเก่าที่ปิดแล้วค่อยดึงตอนต้องใช้ (ค้นหา / ดูเสร็จสิ้น / กรองสถานะปิด / ลิงก์ใบเก่า)
+// ถ้า .gs ยังเป็นตัวเก่า (ไม่ส่ง meta) → ได้ 300 แถวแบบเดิม ทุกอย่างทำงานเหมือนก่อน
+let _adminAll  = false;
+let adminMeta  = null;
+
+function adminHasMore() {
+  return !!(adminMeta && adminMeta.hasMore && !_adminAll);
+}
+
+function loadAllAdmin() {
+  if (!adminHasMore()) return _adminLoading || Promise.resolve();
+  _adminAll = true;
+  // มีโหลดรอบก่อนค้างอยู่ (ขอแบบ active) → รอให้จบแล้วค่อยขอทั้งหมด
+  // ถ้าเรียก loadAdmin ตรง ๆ จะได้คำขอเดิมคืนมา แล้วคำขอ "ทั้งหมด" หายเงียบ
+  return _adminLoading ? _adminLoading.then(() => loadAdmin(true)) : loadAdmin(true);
+}
 async function loadAdmin(force) {
   // cache 60 วิ — สลับแท็บไปมาไม่ต้องโหลดทั้งชีตใหม่ (ปุ่มรีเฟรช = force)
   if (!force && allPRs.length && Date.now() - _adminLoadedAt < 60000) {
@@ -2971,9 +2989,11 @@ async function _loadAdminOnce() {
   if (!hadData) document.getElementById("pr-list").innerHTML = "";
 
   try {
-    const result = await fetchJSONRetry(CONFIG.WEBHOOK_URL + "?limit=300&t=" + Date.now());
+    const q = _adminAll ? "?scope=all&limit=1000" : "?scope=active&recent=150&limit=300";
+    const result = await fetchJSONRetry(CONFIG.WEBHOOK_URL + q + "&t=" + Date.now());
     if (!result.success) throw new Error(result.error || "โหลดข้อมูลไม่ได้");
     allPRs = result.data || [];
+    adminMeta = result.meta || null;
     _adminLoadedAt = Date.now();
     showLoadNote("admin-load-note", "");
     updateStats();
@@ -2993,11 +3013,13 @@ async function _loadAdminOnce() {
 
 function updateStats() {
   const safe = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  safe("s-all",     allPRs.length);
-  safe("s-pending",  allPRs.filter(r => (r["สถานะ"]||"").includes("รอดำเนินการ")).length);
-  safe("s-ordered",  allPRs.filter(r => (r["สถานะ"]||"").includes("สั่งแล้ว") || (r["สถานะ"]||"").includes("รอของ") || (r["สถานะ"]||"").includes("รับบางส่วน")).length);
-  safe("s-approved", allPRs.filter(r => (r["สถานะ"]||"").includes("สำเร็จ")).length);
-  safe("s-rejected", allPRs.filter(r => (r["สถานะ"]||"").includes("ปฏิเสธ")).length);
+  // โหลดมาไม่ครบทุกใบ → ใช้ตัวนับที่เซิร์ฟเวอร์นับจากทั้งชีต
+  const c = adminMeta && adminMeta.counts;
+  safe("s-all",      c ? c.all      : allPRs.length);
+  safe("s-pending",  c ? c.pending  : allPRs.filter(r => (r["สถานะ"]||"").includes("รอดำเนินการ")).length);
+  safe("s-ordered",  c ? c.ordered  : allPRs.filter(r => (r["สถานะ"]||"").includes("สั่งแล้ว") || (r["สถานะ"]||"").includes("รอของ") || (r["สถานะ"]||"").includes("รับบางส่วน")).length);
+  safe("s-approved", c ? c.done     : allPRs.filter(r => (r["สถานะ"]||"").includes("สำเร็จ")).length);
+  safe("s-rejected", c ? c.rejected : allPRs.filter(r => (r["สถานะ"]||"").includes("ปฏิเสธ")).length);
   renderDeptSummary();
   updateVendorSuggestions();
 }
@@ -3143,6 +3165,9 @@ function applyFilter() {
   const fStatus = document.getElementById("f-fstatus").value;
   const fUrg    = document.getElementById("f-furg").value;
   const q       = (document.getElementById("f-search")?.value || "").trim();
+
+  // หาของเก่าแต่ยังโหลดมาไม่ครบ → ดึงทั้งหมดก่อน (ครั้งเดียว) ระหว่างนั้นกรองจากที่มีไปก่อน
+  if ((q || fStatus.includes("สำเร็จ") || fStatus.includes("ปฏิเสธ")) && adminHasMore()) loadAllAdmin();
 
   let filtered = allPRs.filter(r => {
     const st = r["สถานะ"] || '';
@@ -3533,7 +3558,7 @@ function renderPRs(list) {
   if (useToggle) {
     html += `<div class="done-toggle" onclick="toggleAdminDone()">
       <span class="done-toggle-arrow${adminShowDone ? " open" : ""}">▶</span>
-      ✅ เสร็จสิ้นแล้ว ${doneRows.length} รายการ — กดเพื่อ${adminShowDone ? "ซ่อน" : "ดู"}
+      ✅ เสร็จสิ้นแล้ว ${(adminHasMore() && list.length === allPRs.length && adminMeta.counts) ? adminMeta.counts.done : doneRows.length} รายการ — กดเพื่อ${adminShowDone ? "ซ่อน" : "ดู"}
     </div>`;
     if (adminShowDone) html += `<div class="done-section">${doneRows.map(renderCard).join("")}</div>`;
   }
@@ -3541,7 +3566,11 @@ function renderPRs(list) {
 }
 
 let adminShowDone = false;
-function toggleAdminDone() { adminShowDone = !adminShowDone; applyFilter(); }
+function toggleAdminDone() {
+  adminShowDone = !adminShowDone;
+  if (adminShowDone && adminHasMore()) loadAllAdmin();
+  applyFilter();
+}
 
 
 function toggleExpand(id) {
@@ -3807,6 +3836,8 @@ function viewImg(src) {
 function _handleDeepLink() {
   if (!window._deepPR) return;
   const prId = window._deepPR;
+  // ลิงก์ไปใบเก่าที่ยังไม่อยู่ในชุดที่โหลด → ดึงทั้งหมดแล้วค่อยเลื่อนไปหา (โหลดเสร็จจะเรียกฟังก์ชันนี้อีกรอบ)
+  if (!allPRs.some(p => p["PR ID"] === prId) && adminHasMore()) { loadAllAdmin(); return; }
   expanded[prId] = true;
   applyFilter();
   setTimeout(() => {
