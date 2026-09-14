@@ -3746,6 +3746,48 @@ ${pr["comment"] ? `<div class="comment-box"><strong>หมายเหตุ Adm
   else showToast("warn", "กรุณาอนุญาต pop-up เพื่อเปิด PDF");
 }
 
+// ── อัปเดตการ์ดใบเดียวจากคำตอบของเซิร์ฟเวอร์ ─────────────────────
+// เดิมกดปุ่มทีไรโหลดทั้งชุดใหม่ (3–4 วิ) ตอนนี้เซิร์ฟเวอร์ส่งแถวที่อัปเดตแล้วกลับมาด้วย
+// ใบใหม่ของคนอื่นจะยังไม่ขึ้นจนกว่ากดรีเฟรช / สลับแท็บเกิน 60 วิ (เหมือนตอนเปิดหน้าค้างไว้)
+function _statusBuckets(st) {
+  st = String(st || "");
+  return {
+    pending:  st.includes("รอดำเนินการ") ? 1 : 0,
+    ordered:  (st.includes("สั่งแล้ว") || st.includes("รอของ") || st.includes("รับบางส่วน")) ? 1 : 0,
+    done:     st.includes("สำเร็จ") ? 1 : 0,
+    rejected: st.includes("ปฏิเสธ") ? 1 : 0,
+  };
+}
+
+function applyPRUpdate(pr) {
+  if (!pr || !pr["PR ID"]) return false;              // .gs ตัวเก่าไม่ส่งมา → ให้คนเรียกโหลดทั้งชุดแทน
+  const i = allPRs.findIndex(p => p["PR ID"] === pr["PR ID"]);
+  const before = i >= 0 ? allPRs[i] : null;
+  if (i >= 0) allPRs[i] = pr; else allPRs.push(pr);
+
+  // ตัวนับจากทั้งชีต: ปรับเฉพาะส่วนต่างของใบนี้ ไม่ต้องขอนับใหม่
+  const c = adminMeta && adminMeta.counts;
+  if (c) {
+    const a = before ? _statusBuckets(before["สถานะ"]) : { pending:0, ordered:0, done:0, rejected:0 };
+    const b = _statusBuckets(pr["สถานะ"]);
+    Object.keys(b).forEach(k => { c[k] = (c[k] || 0) + b[k] - a[k]; });
+    if (!before) c.all = (c.all || 0) + 1;
+  }
+  _vendorMemo.key = null;                             // ร้านใหม่ที่เพิ่งพิมพ์ต้องขึ้นใน autocomplete
+  updateStats();
+  applyFilter();
+  return true;
+}
+
+// ระหว่างรอเซิร์ฟเวอร์ กันกดปุ่มในการ์ดซ้ำ (เคยมีกด "รับทราบ" รัวจนเกินมา 60 ครั้ง)
+function setCardBusy(prId, on) {
+  const card = document.getElementById("card-" + prId);
+  if (!card) return;
+  card.querySelectorAll("button").forEach(b => { b.disabled = on; });
+  card.style.opacity = on ? "0.6" : "";
+  card.style.pointerEvents = on ? "none" : "";
+}
+
 // ── update status ─────────────────────────────────────────────
 async function updateStatus(prId, status) {
   let comment             = document.getElementById("cmt-" + prId)?.value || "";
@@ -3772,6 +3814,7 @@ async function updateStatus(prId, status) {
     adminUserId: lineProfile.userId || ""
   };
 
+  setCardBusy(prId, true);
   try {
     const res = await fetch(CONFIG.WEBHOOK_URL, {
       method: "POST",
@@ -3781,12 +3824,15 @@ async function updateStatus(prId, status) {
     const result = await res.json();
     if (result.success) {
       // กดสถานะเดิมซ้ำโดยไม่มีข้อมูลใหม่ — บอกเฉยๆ ไม่ใช่ error
-      if (result.noChange) { flashMsg(result.message || "ไม่มีอะไรเปลี่ยนแปลง", "warn"); return; }
-      await loadAdmin(true);
+      if (result.noChange) { setCardBusy(prId, false); flashMsg(result.message || "ไม่มีอะไรเปลี่ยนแปลง", "warn"); return; }
+      if (applyPRUpdate(result.pr)) flashMsg(prId + " → " + (result.pr["สถานะ"] || "อัปเดตแล้ว"));
+      else await loadAdmin(true);
     } else {
+      setCardBusy(prId, false);
       if (!handleAuthError(result.error)) alert("เกิดข้อผิดพลาด: " + result.error);
     }
   } catch (err) {
+    setCardBusy(prId, false);
     alert("ไม่สามารถอัปเดตได้: " + err.message);
   }
 }
@@ -3804,6 +3850,7 @@ function printMyPR(prId) {
 async function adminSaveEdit(prId) {
   const items = editedData[prId];
   if (!items || !items.length) { applyFilter(); return; }
+  setCardBusy(prId, true);
   try {
     const res = await fetch(CONFIG.WEBHOOK_URL, {
       method: "POST",
@@ -3814,7 +3861,7 @@ async function adminSaveEdit(prId) {
     const result = await res.json();
     if (result.success) {
       showToast("ok", "✅ บันทึกรายการแล้ว");
-      await loadAdmin(true);
+      if (!applyPRUpdate(result.pr)) await loadAdmin(true);
     } else {
       if (!handleAuthError(result.error)) showToast("err", result.error || "บันทึกไม่ได้");
       editMode[prId] = true; applyFilter();
