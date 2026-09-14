@@ -1681,7 +1681,7 @@ function renderMyPRs() {
             <span class="pr-id">${prId}</span>
             <span class="pr-dept">${pr["แผนก"] || "-"}</span>
           </div>
-          <div class="pr-meta">ส่งเมื่อ ${fmtSent(pr["วันที่ส่ง"])} · ต้องการ ${pr["วันที่ต้องการ"]||"-"} · ${urgRaw}${pr["ร้านค้า/แหล่งซื้อ"] ? ` · <span style="color:#9B7330;font-weight:500">🏪 ${pr["ร้านค้า/แหล่งซื้อ"]}</span>` : ""}</div>
+          <div class="pr-meta">ส่งเมื่อ ${fmtSent(pr["วันที่ส่ง"])} · ต้องการ ${fmtNeed(pr["วันที่ต้องการ"])} · ${urgRaw}${pr["ร้านค้า/แหล่งซื้อ"] ? ` · <span style="color:#9B7330;font-weight:500">🏪 ${pr["ร้านค้า/แหล่งซื้อ"]}</span>` : ""}</div>
         </div>
         <span class="badge ${badgeCls}">${status}</span>
       </div>
@@ -1694,7 +1694,7 @@ function renderMyPRs() {
         <div class="form-grid" style="gap:12px;margin-bottom:12px">
           <div class="field">
             <label>วันที่ต้องการ</label>
-            <input type="date" id="edit-date-${prId}" value="${pr["วันที่ต้องการ"]||""}">
+            <input type="date" id="edit-date-${prId}" value="${needDateISO(pr["วันที่ต้องการ"])}">
           </div>
           <div class="field">
             <label>ความเร่งด่วน</label>
@@ -1950,7 +1950,10 @@ async function saveMyEdit(prId) {
   btn.textContent = "กำลังบันทึก...";
 
   const items    = myEditItems[prId] || [];
-  const needDate = document.getElementById("edit-date-"+prId)?.value || "";
+  // ช่องวันที่ว่าง = ไม่ได้ตั้งใจลบ ใช้วันเดิม
+  // (เดิมช่องนี้อ่านวันที่ในชีตไม่ออกเลยว่างเสมอ กดบันทึกทีไรวันที่ต้องการถูกล้างทิ้ง)
+  const needDate = document.getElementById("edit-date-"+prId)?.value
+    || needDateISO(pr["วันที่ต้องการ"]) || String(pr["วันที่ต้องการ"] || "");
   const urgency  = document.getElementById("edit-urg-"+prId)?.value  || "normal";
   const note     = document.getElementById("edit-note-"+prId)?.value || "";
 
@@ -3009,6 +3012,28 @@ function updateVendorSuggestions() {
 // ── สรุปยอดรายแผนก เดือนนี้ ──────────────────────────────────
 // แปลงวันที่ไทย "19/7/69" หรือ "19/7/2569" หรือ ISO → Date
 // แสดงวันที่ให้อ่านง่าย: ถ้าเป็น ISO (ของเก่าที่ Sheets แปลงไว้) → แปลงเป็น d/M/พ.ศ. HH:mm
+// ── วันที่ต้องการ ─────────────────────────────────────────────
+// ผู้ขอเลือก "2026-09-15" แต่ Sheets แปลงเป็นวันที่ แล้วส่งกลับมาเป็นเวลา UTC
+// "2026-09-14T17:00:00.000Z" (= เที่ยงคืน 15 ก.ย. เวลาไทย)
+// ถ้าแสดงตรง ๆ คนอ่านเป็น 14 ก.ย. = เร็วไป 1 วัน และช่อง <input type=date> อ่านไม่ออก
+function needDateISO(v) {                       // → "2026-09-15" สำหรับ <input type=date>
+  const s = String(v == null ? "" : v).trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+    const d = new Date(s);
+    if (!isNaN(d)) return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(d);
+  }
+  return "";
+}
+
+function fmtNeed(v) {                           // → "15/9/2569" สำหรับแสดงผล
+  const iso = needDateISO(v);
+  if (!iso) return String(v == null ? "" : v).trim() || "-";   // ข้อความรูปแบบอื่น แสดงตามเดิม
+  const [y, m, d] = iso.split("-").map(Number);
+  return d + "/" + m + "/" + (y + 543);
+}
+
 function fmtSent(v) {
   if (!v) return "-";
   const s = String(v).trim();
@@ -3168,7 +3193,7 @@ function renderPRs(list) {
     // ชื่อผู้ส่ง — ตรงกับ Sheet column จริง
     const senderName = pr["ชื่อ Line"] || pr["ผู้ส่ง"] || "-";
     const senderId   = pr["Line UserID"] || "-";
-    const needDate   = pr["วันที่ต้องการ"] || "-";
+    const needDate   = fmtNeed(pr["วันที่ต้องการ"]);
     const sentDate   = fmtSent(pr["วันที่ส่ง"]);
 
     // parse items — column "รายการ JSON" (ซ่อนอยู่ใน Sheet แต่ยังส่งมาใน JSON)
@@ -3630,7 +3655,7 @@ function printPR(prId) {
 <div class="info-grid">
   <div class="info-row"><span class="info-label">🏢 แผนก</span><span class="info-val">${pr["แผนก"] || "—"}</span></div>
   <div class="info-row"><span class="info-label">👤 ผู้ส่ง</span><span class="info-val">${pr["ชื่อ Line"] || "—"}</span></div>
-  <div class="info-row"><span class="info-label">📅 ต้องการวันที่</span><span class="info-val">${pr["วันที่ต้องการ"] || "—"}</span></div>
+  <div class="info-row"><span class="info-label">📅 ต้องการวันที่</span><span class="info-val">${fmtNeed(pr["วันที่ต้องการ"])}</span></div>
   <div class="info-row"><span class="info-label">⚡ ความเร่งด่วน</span><span class="info-val" style="color:${urgColor}">${urgRaw || "—"}</span></div>
 </div>
 
