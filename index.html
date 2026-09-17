@@ -533,6 +533,7 @@ body {
 .step-label { font-size: 9px; color: var(--text-3); margin-top: 4px; text-align: center; line-height: 1.3; white-space: nowrap; }
 .step-item.step-done .step-label    { color: var(--success); }
 .step-item.step-current .step-label { color: var(--gold); font-weight: 600; }
+.step-by { font-size: 9px; color: var(--text-2); margin-top: 1px; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
 .step-action-area {
   display: flex; gap: 8px; align-items: center;
   padding-top: 10px; flex-wrap: wrap;
@@ -1431,6 +1432,7 @@ function showUserPill(displayName, pictureUrl) {
     nameInput.disabled = true;
     nameInput.title = "ดึงจาก LINE Profile อัตโนมัติ";
     localStorage.setItem('vpAdminName', adminName);
+    openAdmin();          // เปิดมาจากลิงก์ใน LINE (อยู่หน้า Admin อยู่แล้ว) → โหลดเลย
   }
 }
 
@@ -1482,7 +1484,7 @@ async function loadMyPRs() {
       headers: { "Content-Type": "text/plain" },
     });
     if (result.success) {
-      myPRs = result.data || [];
+      myPRs = (result.data || []).map(normalizePR);
       _myLoadedAt = Date.now();
       showLoadNote("myprs-load-note", "");
       renderMyPRs();
@@ -1566,19 +1568,22 @@ function buildPRTimeline(pr, status) {
     }
   }
 
-  // Sub-text per step
+  // Sub-text per step — ชื่อคนกดจากประวัติ ใบเก่าที่ไม่มีประวัติใช้คนกดล่าสุดกับขั้นปัจจุบัน
+  const byAt = (keys, idx) => stepBy(pr, keys) || (curStep === idx ? updatedBy : '');
+  const ackBy = curStep >= 1 ? byAt(['acknowledged'], 1) : '';
+  const ordBy = curStep >= 2 ? byAt(['ordered', 'waiting'], 2) : '';
   const stepSub = [
-    (pr['วันที่ส่ง'] || '') + (status.includes('รออนุมัติ') ? ' · 🔵 รออนุมัติผู้จัดการ (ยอดเกินวงเงิน)' : ''),
-    (curStep === 1 && updatedBy) ? 'โดย ' + updatedBy : '',
+    (pr['วันที่ส่ง'] || '') + (status.includes('รออนุมัติ') ? ' · 🔵 รออนุมัติผู้จัดการ' : ''),
+    ackBy ? 'โดย ' + escAttr(ackBy) : '',
     (function(){
       const m = status.match(/รับบางส่วน\s*(\d+\/\d+)/);
       return [
         m ? '🟠 รับแล้ว ' + m[1] : '',
-        eta ? '📦 คาดว่าถึง ' + eta : '',
-        (curStep === 2 && updatedBy) ? 'โดย ' + updatedBy : '',
+        eta ? '📦 คาดว่าถึง ' + fmtNeed(eta) : '',
+        ordBy ? 'โดย ' + escAttr(ordBy) : '',
       ].filter(Boolean).join(' · ');
     })(),
-    (curStep === 3) ? (pr['ยืนยันรับของโดย'] ? 'ยืนยันโดย ' + pr['ยืนยันรับของโดย'] : (updatedBy ? 'โดย ' + updatedBy : '')) : '',
+    (curStep === 3) ? (pr['ยืนยันรับของโดย'] ? 'ยืนยันโดย ' + pr['ยืนยันรับของโดย'] : (byAt(['done'], 3) ? 'โดย ' + escAttr(byAt(['done'], 3)) : '')) : '',
   ];
 
   let html = '<div class="pr-timeline">';
@@ -1607,7 +1612,8 @@ function buildPRTimeline(pr, status) {
     html += '<div class="tl-title">ปฏิเสธคำขอ</div>';
     const rejReason = pr['comment'] || '';
     if (rejReason)  html += '<div class="tl-sub">เหตุผล: ' + rejReason + '</div>';
-    if (updatedBy)  html += '<div class="tl-sub">โดย ' + updatedBy + '</div>';
+    const rejBy = stepBy(pr, ['rejected']) || updatedBy;
+    if (rejBy)  html += '<div class="tl-sub">โดย ' + escAttr(rejBy) + '</div>';
     html += '</div></div>';
   }
 
@@ -2221,6 +2227,8 @@ function switchTab(tab, btn) {
   document.getElementById("view-" + tab).classList.add("active");
   btn.classList.add("active");
   if (tab === "myprs" && lineProfile.userId) loadMyPRs();
+  // เดิมกดแท็บ Admin แล้วไม่โหลดอะไรเลย ต้องกดรีเฟรชเองทุกครั้ง
+  if (tab === "admin") openAdmin();
 }
 
 // ── items: formItems array เป็น source of truth เดียว ────────
@@ -2982,6 +2990,19 @@ async function loadAdmin(force) {
   return _adminLoading;
 }
 
+function adminURL() {
+  return CONFIG.WEBHOOK_URL + (_adminAll ? "?scope=all&limit=1000" : "?scope=active&recent=150&limit=300") + "&t=" + Date.now();
+}
+
+// รับข้อมูลชุดใหม่เข้าหน้า + จำไว้ในเครื่องสำหรับเปิดครั้งหน้า
+function takeAdminData(result) {
+  allPRs = (result.data || []).map(normalizePR);
+  adminMeta = result.meta || null;
+  _adminLoadedAt = Date.now();
+  _adminSig = JSON.stringify(result.data || []);
+  cacheSet(ADMIN_CACHE_KEY, { savedAt: _adminLoadedAt, data: result.data || [], meta: adminMeta });
+}
+
 async function _loadAdminOnce() {
   const hadData = allPRs.length > 0;
   document.getElementById("loading").classList.add("show");
@@ -2989,19 +3010,16 @@ async function _loadAdminOnce() {
   if (!hadData) document.getElementById("pr-list").innerHTML = "";
 
   try {
-    const q = _adminAll ? "?scope=all&limit=1000" : "?scope=active&recent=150&limit=300";
-    const result = await fetchJSONRetry(CONFIG.WEBHOOK_URL + q + "&t=" + Date.now());
+    const result = await fetchJSONRetry(adminURL());
     if (!result.success) throw new Error(result.error || "โหลดข้อมูลไม่ได้");
-    allPRs = result.data || [];
-    adminMeta = result.meta || null;
-    _adminLoadedAt = Date.now();
+    takeAdminData(result);
     showLoadNote("admin-load-note", "");
     updateStats();
     applyFilter();
     _handleDeepLink();
   } catch (err) {
     if (hadData) {
-      showLoadNote("admin-load-note", loadNoteHTML(_adminLoadedAt, err.message, "loadAdmin(true)"));
+      showLoadNote("admin-load-note", loadNoteHTML(_adminLoadedAt || _adminCacheAt, err.message, "loadAdmin(true)"));
       applyFilter();                       // รายการเดิมยังอยู่ครบ
     } else {
       document.getElementById("pr-list").innerHTML = loadErrorHTML(err.message, "loadAdmin(true)");
@@ -3010,6 +3028,124 @@ async function _loadAdminOnce() {
     document.getElementById("loading").classList.remove("show");
   }
 }
+
+// ── 1) เปิดหน้า Admin แล้วเห็นข้อมูลทันที ──────────────────────
+// Google Apps Script ใช้ ~2 วิทุกคำขอ และกระตุกได้ถึง 70 วิ (วัดจริง 15 ก.ย.)
+// → โชว์ชุดล่าสุดที่จำไว้ในเครื่องก่อน แล้วอัปเดตตามหลัง
+// เก็บใน IndexedDB ไม่ใช่ localStorage: pointnaja.github.io ใช้ร่วมกับระบบแจ้งซ่อม โควต้า 5MB
+const ADMIN_CACHE_KEY    = "admin-v1";
+const ADMIN_CACHE_MAX_MS = 3 * 24 * 60 * 60 * 1000;   // เก่ากว่า 3 วันไม่เอามาโชว์
+let _adminCacheAt = 0;
+let _adminSig     = "";
+
+// เปิดครั้งเดียวแล้วใช้ต่อ (เดิมเปิดใหม่ทุกครั้งไม่เคยปิด)
+let _idbPromise = null;
+function _idb() {
+  if (!_idbPromise) {
+    _idbPromise = new Promise((resolve, reject) => {
+      if (!window.indexedDB) return reject(new Error("no indexedDB"));
+      const req = indexedDB.open("vp-pr", 1);
+      req.onupgradeneeded = () => req.result.createObjectStore("kv");
+      req.onsuccess = () => resolve(req.result);
+      req.onerror   = () => reject(req.error);
+      req.onblocked = () => reject(new Error("indexedDB blocked"));
+    });
+    _idbPromise.catch(() => { _idbPromise = null; });
+  }
+  return _idbPromise;
+}
+
+async function cacheGet(key) {
+  // ตัดเวลาครอบ "ทั้งหมด" รวมตอนเปิดฐานข้อมูล — ถ้าค้าง หน้า Admin ต้องไปโหลดจากเซิร์ฟเวอร์ต่อได้
+  // (เคยครอบแค่ตอนอ่าน ถ้าเปิดฐานข้อมูลค้าง openAdmin จะรอไปตลอดและไม่โหลดอะไรเลย)
+  const read = (async () => {
+    try {
+      const db = await _idb();
+      return await new Promise(res => {
+        const q = db.transaction("kv").objectStore("kv").get(key);
+        q.onsuccess = () => res(q.result || null);
+        q.onerror   = () => res(null);
+      });
+    } catch (e) { return null; }
+  })();
+  return Promise.race([read, new Promise(res => setTimeout(() => res(null), 1500))]);
+}
+
+async function cacheSet(key, value) {
+  try { const db = await _idb(); db.transaction("kv", "readwrite").objectStore("kv").put(value, key); } catch (e) {}
+}
+
+function adminViewOpen() {
+  return document.getElementById("view-admin")?.classList.contains("active")
+      && document.getElementById("admin-dash")?.style.display !== "none";
+}
+
+async function openAdmin() {
+  if (!adminViewOpen()) return;
+  if (!allPRs.length) {
+    const c = await cacheGet(ADMIN_CACHE_KEY);
+    if (c && Array.isArray(c.data) && c.data.length && Date.now() - c.savedAt < ADMIN_CACHE_MAX_MS && !allPRs.length) {
+      allPRs = c.data.map(normalizePR);
+      adminMeta = c.meta || null;
+      _adminCacheAt = c.savedAt;
+      _adminSig = JSON.stringify(c.data);
+      const t = new Date(c.savedAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+      showLoadNote("admin-load-note", `<div style="margin:0 0 12px;padding:8px 12px;background:var(--accent-light);border:1px solid var(--border);border-radius:9px;font-size:12px;color:var(--text-2)">🕘 แสดงข้อมูลที่จำไว้เมื่อ ${t} น. — กำลังอัปเดต…</div>`);
+      updateStats();
+      applyFilter();
+    }
+  }
+  loadAdmin(false);     // เพิ่งโหลดไม่ถึง 60 วิ = ไม่ยิงซ้ำ
+}
+
+// ── 2) เช็คใบใหม่ให้เอง ───────────────────────────────────────
+// ทุก 3 นาทีระหว่างเปิดหน้า Admin อยู่ + ตอนสลับกลับมาที่แอป
+// ข้ามถ้ากำลังพิมพ์/แก้รายการอยู่ (render ใหม่แล้วที่พิมพ์ค้างจะหาย) — รอรอบถัดไป
+const ADMIN_POLL_MS = 3 * 60 * 1000;
+
+function adminIsBusy() {
+  if (Object.keys(editMode).some(k => editMode[k])) return true;
+  const view = document.getElementById("view-admin");
+  const a = document.activeElement;
+  if (a && view && view.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.id !== "f-search") return true;
+  const list = document.getElementById("pr-list");
+  if (list && [...list.querySelectorAll('input[id^="cmt-"], input[id^="eta-"]')].some(i => i.value.trim())) return true;
+  if (list && [...list.querySelectorAll(".pr-card")].some(c => c.style.pointerEvents === "none")) return true;   // กำลังส่งสถานะ
+  return false;
+}
+
+async function adminAutoCheck(reason) {
+  if (document.visibilityState !== "visible" || !adminViewOpen() || _adminLoading) return;
+  if (!_adminLoadedAt) return;                                  // ยังไม่เคยโหลดสำเร็จ ให้ loadAdmin ปกติจัดการ
+  const age = Date.now() - _adminLoadedAt;
+  if (age < (reason === "resume" ? 60000 : ADMIN_POLL_MS)) return;
+  if (adminIsBusy()) return;
+
+  const before = new Set(allPRs.map(p => p["PR ID"]));
+  _adminLoading = (async () => {
+    try {
+      const result = await fetchJSONRetry(adminURL(), undefined, 1);   // เบื้องหลัง: ลองครั้งเดียว พลาดก็เงียบ
+      if (!result.success) return;
+      if (adminIsBusy()) return;                                 // เริ่มพิมพ์ระหว่างรอ → ไม่ทับ รอบหน้าค่อยเอา
+      if (JSON.stringify(result.data || []) === _adminSig) {     // ไม่มีอะไรเปลี่ยน → ไม่ render ให้จอกระตุก
+        _adminLoadedAt = Date.now();
+        adminMeta = result.meta || adminMeta;
+        return;
+      }
+      takeAdminData(result);
+      showLoadNote("admin-load-note", "");
+      updateStats();
+      applyFilter();
+      const fresh = allPRs.filter(p => !before.has(p["PR ID"])).length;
+      if (fresh) flashMsg("📥 มี PR ใหม่ " + fresh + " ใบ");
+    } catch (e) { /* เบื้องหลัง พลาดเงียบ ๆ */ }
+  })().finally(() => { _adminLoading = null; });
+}
+
+setInterval(() => adminAutoCheck("tick"), 30000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") adminAutoCheck("resume");
+});
 
 function updateStats() {
   const safe = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
@@ -3034,6 +3170,28 @@ function updateVendorSuggestions() {
 // ── สรุปยอดรายแผนก เดือนนี้ ──────────────────────────────────
 // แปลงวันที่ไทย "19/7/69" หรือ "19/7/2569" หรือ ISO → Date
 // แสดงวันที่ให้อ่านง่าย: ถ้าเป็น ISO (ของเก่าที่ Sheets แปลงไว้) → แปลงเป็น d/M/พ.ศ. HH:mm
+// ── ชื่อคอลัมน์ + ประวัติว่าใครกดขั้นไหน ─────────────────────────
+// .gs ใหม่ตั้งชื่อ key ตามตำแหน่งคอลัมน์ให้แล้ว ส่วนนี้กันกรณี .gs ยังเป็นตัวเก่า
+// (ในชีตมีคนเปลี่ยนหัวคอลัมน์ ชื่อคนกด/วันของถึงเลยไม่เคยขึ้น)
+const COL_ALIASES = { "ADMIN": "ดำเนินการโดย", "คาดว่าของถึง": "วันที่คาดว่าของจะถึง" };
+function normalizePR(pr) {
+  if (!pr) return pr;
+  Object.keys(COL_ALIASES).forEach(a => {
+    const c = COL_ALIASES[a];
+    if (a in pr && !(c in pr)) pr[c] = pr[a];
+  });
+  return pr;
+}
+
+// คอลัมน์ U: { "acknowledged": { by, at }, "ordered": {...} }
+// ใบเก่าก่อนมีคอลัมน์นี้ = ว่าง → ใช้ชื่อคนกดล่าสุดกับขั้นปัจจุบันแทน
+function stepBy(pr, keys) {
+  let h = {};
+  try { h = JSON.parse(pr["ประวัติสถานะ"] || "{}") || {}; } catch (e) {}
+  for (const k of keys) if (h[k] && h[k].by) return String(h[k].by);
+  return "";
+}
+
 // ── วันที่ต้องการ ─────────────────────────────────────────────
 // ผู้ขอเลือก "2026-09-15" แต่ Sheets แปลงเป็นวันที่ แล้วส่งกลับมาเป็นเวลา UTC
 // "2026-09-14T17:00:00.000Z" (= เที่ยงคืน 15 ก.ย. เวลาไทย)
@@ -3260,8 +3418,7 @@ function renderPRs(list) {
             <div class="pr-meta">
               👤 ${senderName} · ส่งเมื่อ ${sentDate} · ต้องการ ${needDate}
               ${urgRaw ? " · " + urgRaw : ""}
-              ${eta ? ` · <span style="color:#0077B6;font-weight:500">📦 คาดว่าถึง ${eta}</span>` : ""}
-              ${updatedBy ? ` · <span style="color:var(--text-3)">by ${updatedBy}</span>` : ""}
+              ${eta ? ` · <span style="color:#0077B6;font-weight:500">📦 คาดว่าถึง ${fmtNeed(eta)}</span>` : ""}
               ${pr["ร้านค้า/แหล่งซื้อ"] ? ` · <span style="color:#9B7330;font-weight:500">🏪 ${pr["ร้านค้า/แหล่งซื้อ"]}</span>` : ""}
             </div>
           </div>
@@ -3486,7 +3643,7 @@ function renderPRs(list) {
           if (isApproval) {
             return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
               <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#DBEAFE;border-radius:7px;font-size:13px;color:#1D4ED8;font-weight:500">
-                🔵 รออนุมัติ — ยอดรวมเกินวงเงินที่กำหนด ต้องให้ผู้จัดการอนุมัติก่อน
+                🔵 รออนุมัติ — ของใหญ่/ครุภัณฑ์ หรือแผนกที่ต้องอนุมัติทุกใบ ต้องให้ผู้จัดการอนุมัติก่อน
               </div>
               <div class="step-action-area">
                 <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ...">
@@ -3506,14 +3663,24 @@ function renderPRs(list) {
             : STEPS.findIndex(s => status.includes(s.match));
           const safeI  = ci < 0 ? 0 : ci;
 
+          // ชื่อคนกดใต้แต่ละขั้น (ขั้นแรก = ผู้ขอ มีอยู่บนการ์ดแล้ว)
+          const STEP_KEYS = [null, ['acknowledged'], ['ordered', 'waiting'], ['done']];
+          const whoDid = (i) => {
+            if (isRej || !STEP_KEYS[i] || i > safeI) return '';
+            let by = stepBy(pr, STEP_KEYS[i]);
+            if (!by && i === 3) by = pr['ยืนยันรับของโดย'] || '';
+            if (!by && i === safeI) by = updatedBy;       // ใบเก่า: รู้แค่คนกดล่าสุด = คนทำขั้นปัจจุบัน
+            return by;
+          };
           const dots = STEPS.map((s, i) => {
             const cls = isRej ? '' : i < safeI ? 'step-done' : i === safeI ? 'step-current' : '';
             const dot = (!isRej && i < safeI) ? '✓' : s.emoji;
-            return `<div class="step-item ${cls}"><div class="step-dot">${dot}</div><div class="step-label">${s.th}</div></div>`;
+            const by  = whoDid(i);
+            return `<div class="step-item ${cls}"><div class="step-dot">${dot}</div><div class="step-label">${s.th}</div>${by ? `<div class="step-by" title="${escAttr(by)}">${escAttr(by)}</div>` : ''}</div>`;
           }).join('');
 
           const stepper = isRej
-            ? `<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--danger-bg);border-radius:7px;font-size:13px;color:var(--danger);font-weight:500">❌ ปฏิเสธแล้ว${comment ? ' — '+comment : ''}</div>`
+            ? `<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--danger-bg);border-radius:7px;font-size:13px;color:var(--danger);font-weight:500">❌ ปฏิเสธแล้ว${comment ? ' — '+comment : ''}${(() => { const by = stepBy(pr, ['rejected']) || updatedBy; return by ? ` <span style="font-weight:400;opacity:.8">· โดย ${escAttr(by)}</span>` : ''; })()}</div>`
             : `<div class="status-stepper">${dots}</div>`;
 
           const curStep = !isRej && !isDone ? STEPS[safeI] : null;
@@ -3522,7 +3689,7 @@ function renderPRs(list) {
                 <input type="text" id="cmt-${prId}" placeholder="หมายเหตุ...">
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                   <label style="font-size:11px;color:var(--text-3);white-space:nowrap">📦 คาดว่าของถึง:</label>
-                  <input type="date" id="eta-${prId}" value="${pr['วันที่คาดว่าของจะถึง']||''}"
+                  <input type="date" id="eta-${prId}" value="${needDateISO(pr['วันที่คาดว่าของจะถึง'])}"
                     style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:var(--sans);font-size:12px;background:var(--bg);color:var(--text)">
                 </div>
                 <button class="btn-next-step" onclick="updateStatus('${prId}','${curStep.nextKey}')">${curStep.nextTh} →</button>
@@ -3761,6 +3928,7 @@ function _statusBuckets(st) {
 
 function applyPRUpdate(pr) {
   if (!pr || !pr["PR ID"]) return false;              // .gs ตัวเก่าไม่ส่งมา → ให้คนเรียกโหลดทั้งชุดแทน
+  normalizePR(pr);
   const i = allPRs.findIndex(p => p["PR ID"] === pr["PR ID"]);
   const before = i >= 0 ? allPRs[i] : null;
   if (i >= 0) allPRs[i] = pr; else allPRs.push(pr);
