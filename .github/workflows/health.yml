@@ -1,0 +1,36 @@
+# ตัวเฝ้าระบบ PR จากข้างนอก
+# ─────────────────────────────────────────────────────────────
+# ชั้นแจ้งเตือนใน Apps Script รายงานตัวเองได้เฉพาะตอนที่ตัวเองยังทำงานอยู่
+# ถ้า Apps Script ล่มทั้งตัว / deploy พัง / ต้องขอสิทธิ์ใหม่ จะไม่มีใครรู้
+# ไฟล์นี้ให้ GitHub เช็คทุก 30 นาที — ถ้าไม่ผ่าน GitHub จะส่งอีเมลเตือนเจ้าของ repo เอง
+#
+# วิธีใช้: อัปไฟล์นี้ขึ้น repo pr-system ที่ path  .github/workflows/health.yml
+# (ชื่อโฟลเดอร์ต้องตรงเป๊ะ ขึ้นต้นด้วยจุด)
+name: PR system health
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"    # ทุก 30 นาที (เวลา UTC — ไม่สำคัญเพราะเช็คตลอดวัน)
+  workflow_dispatch:           # กดเช็คเองได้จากแท็บ Actions
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: เช็คว่าระบบ PR ยังทำงานอยู่
+        env:
+          URL: https://script.google.com/macros/s/AKfycbyHn2i50bAojiVhVCBs9eL17LJ0km-FB-8IuYZz7W1F_zFocWe210WCSSjvB1o3ygD8Sw/exec
+        run: |
+          # Apps Script กระตุกได้ถึง 70 วินาทีเป็นครั้งคราว (วัดจริง)
+          # จึงต้องลอง 3 ครั้งก่อนตัดสินว่าพัง ไม่งั้นจะเตือนผิดบ่อย
+          for i in 1 2 3; do
+            body=$(curl -sL --max-time 90 "$URL?health=1&t=$(date +%s)" || true)
+            echo "ครั้งที่ $i: $body"
+            case "$body" in
+              *'"ok":true'*)  echo "✅ ระบบปกติ"; exit 0 ;;
+              *'"ok":false'*) echo "❌ ระบบตอบว่ามีปัญหา: $body"; exit 1 ;;
+            esac
+            sleep 20
+          done
+          echo "❌ เรียกระบบไม่สำเร็จ 3 ครั้งติด — Apps Script อาจล่มหรือ deploy พัง"
+          exit 1
