@@ -1030,13 +1030,13 @@ body {
             </div>
           </div>
 
-          <!-- ของใหญ่/ครุภัณฑ์ → ต้องให้ผู้จัดการอนุมัติก่อน -->
+          <!-- ของใหญ่/ครุภัณฑ์ → ป้ายกำกับเฉยๆ (ขั้นอนุมัติปิดแล้ว 2026-10-06) -->
           <div class="field span2">
             <label class="bigitem-box">
               <input type="checkbox" id="f-bigitem">
               <span>
                 <span class="bigitem-title">เป็นของใหญ่ / ครุภัณฑ์ / ของราคาสูง</span>
-                <span class="bigitem-sub">เช่น เครื่องใช้ไฟฟ้า เฟอร์นิเจอร์ อุปกรณ์ราคาสูง — จะส่งให้ผู้จัดการอนุมัติก่อน</span>
+                <span class="bigitem-sub">เช่น เครื่องใช้ไฟฟ้า เฟอร์นิเจอร์ อุปกรณ์ราคาสูง — ติ๊กไว้เพื่อให้จัดซื้อเห็นชัดว่าเป็นของชิ้นใหญ่</span>
               </span>
             </label>
           </div>
@@ -3418,6 +3418,7 @@ function renderPRs(list) {
             <div class="pr-meta">
               👤 ${senderName} · ส่งเมื่อ ${sentDate} · ต้องการ ${needDate}
               ${urgRaw ? " · " + urgRaw : ""}
+              ${String(pr["ของใหญ่/ครุภัณฑ์"] || "").trim() ? ` · <span style="color:#7A5B18;font-weight:600">📦 ของใหญ่/ครุภัณฑ์</span>` : ""}
               ${eta ? ` · <span style="color:#0077B6;font-weight:500">📦 คาดว่าถึง ${fmtNeed(eta)}</span>` : ""}
               ${pr["ร้านค้า/แหล่งซื้อ"] ? ` · <span style="color:#9B7330;font-weight:500">🏪 ${pr["ร้านค้า/แหล่งซื้อ"]}</span>` : ""}
             </div>
